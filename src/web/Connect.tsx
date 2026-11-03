@@ -21,14 +21,30 @@ export function ConnectForm({ onConnect, busy, error }: { onConnect: (token: str
   const [token, setToken] = useState("");
   const [repo, setRepo] = useState("");
   const [remember, setRemember] = useState(false);
-  const ready = token.trim().length >= 20 && /^[\w.-]+\/[\w.-]+$/.test(repo.trim());
+  const [hint, setHint] = useState("");
+  const cleanToken = () => token.trim().replace(/^bearer\s+/i, "");
+  const cleanRepo = () => repo.trim().replace(/^https?:\/\/github\.com\//i, "").replace(/\.git$/i, "").replace(/\/+$/, "");
+  const problem = (): string => {
+    if (!cleanToken()) return "Paste your GitHub token first.";
+    if (!/^[A-Za-z0-9_]{20,255}$/.test(cleanToken())) return "That does not look like a GitHub token (it starts with ghp_ or github_pat_ and has no spaces).";
+    if (!cleanRepo()) return "Enter the repository as owner/name, for example your-name/your-repo.";
+    if (!/^[\w.-]+\/[\w.-]+$/.test(cleanRepo())) return "The repository must look like owner/name (a github.com link also works).";
+    return "";
+  };
+  const submit = () => {
+    if (busy) return;
+    const p = problem();
+    setHint(p);
+    if (!p) onConnect(cleanToken(), cleanRepo(), remember);
+  };
   return (
     <form
       className="dock-grid"
       aria-label="Connect GitHub"
+      noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        if (ready && !busy) onConnect(token.trim(), repo.trim(), remember);
+        submit();
       }}
     >
       <div className="dock-intro">
@@ -51,16 +67,17 @@ export function ConnectForm({ onConnect, busy, error }: { onConnect: (token: str
       <div className="dock-form">
         <label>
           <span className="label">GitHub token</span>
-          <input type="password" autoComplete="off" spellCheck={false} aria-label="GitHub token" placeholder="github_pat_…" value={token} onChange={(e) => setToken(e.target.value)} />
+          <input type="password" autoComplete="off" spellCheck={false} aria-label="GitHub token" placeholder="github_pat_…" value={token} onChange={(e) => { setToken(e.target.value); setHint(""); }} />
         </label>
         <label>
           <span className="label">Repository</span>
-          <input type="text" autoComplete="off" spellCheck={false} aria-label="Repository (owner/name)" placeholder="your-name/your-repo" value={repo} onChange={(e) => setRepo(e.target.value)} />
+          <input type="text" autoComplete="off" spellCheck={false} aria-label="Repository (owner/name)" placeholder="your-name/your-repo" value={repo} onChange={(e) => { setRepo(e.target.value); setHint(""); }} />
         </label>
         <label className="check">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Remember on this device (otherwise it is forgotten when the tab closes)
         </label>
-        <button className="btn" type="submit" disabled={!ready || busy}>{busy ? "Checking with GitHub…" : "Connect"}</button>
+        <button className="btn" type="submit" disabled={busy}>{busy ? "Checking with GitHub…" : "Connect"}</button>
+        {hint && !error && <p className="warn" role="alert">{hint}</p>}
         {error && <p className="warn" role="alert">{error}</p>}
       </div>
     </form>

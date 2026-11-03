@@ -119,7 +119,7 @@ export function Solution() {
             </p>
             <Link className="link" href="/app">Learn more</Link>
           </div>
-          <TerminalPlayer lines={transcriptLines} title="swy-tm demo · recorded sample run (offline)" />
+          <TerminalPlayer lines={transcriptLines} title="swy-tm demo · recorded real run · live GitHub" />
         </div>
         <div className="row2 flip">
           <div>
@@ -130,7 +130,7 @@ export function Solution() {
             <Link className="link" href="/app">Learn more</Link>
           </div>
           <div className="frame" style={{ padding: 16 }}>
-            <div className="label">Live miniature · recorded sample data</div>
+            <div className="label">Live miniature · recorded from a real GitHub run</div>
             <TimelineScrubber steps={miniSteps} value={v} onChange={setV} onCommit={(i) => setV(i)} />
             <DiffView diff={d} />
           </div>

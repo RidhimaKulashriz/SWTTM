@@ -81,7 +81,7 @@ Real executor (needs the `swytchcode` binary, run from the repo root where `.swy
 - REA reference study was skipped; Lighthouse was not run (see docs/ui-parity.md).
 
 ## How to reproduce
-`npm install && ./bin/swy-tm demo` (spec's `npm run demo` is not available, see above). Sample output from a real demo run is committed in `examples/snapshots/` and `examples/transcripts/demo.json`; the website's hero, terminal player and static `/app` demo are built from those files.
+`npm install && ./bin/swy-tm demo` (spec's `npm run demo` is not available, see above). The landing page's hero, terminal player and miniature are built from `examples/snapshots/demo.json` and `examples/transcripts/demo.json`, which were captured from a real run against the GitHub REST API (not the simulator). The `/app` debugger shows no sample data at all: it stays empty until you connect your own token and repository.
 
 ## Demo video
 TODO_ADD_VIDEO_URL

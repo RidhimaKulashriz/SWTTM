@@ -1,1158 +1,793 @@
 {
-  "source": "swy-tm demo (MOCK executor, in-memory tracker — not a real API)",
-  "generatedAt": "2026-11-02T17:17:05.450Z",
-  "runs": [
-    {
-      "manifest": {
-        "runId": "r_EqmSja",
-        "workflowId": "demo-tracker",
-        "createdAt": "2026-11-02T17:16:50.016Z",
-        "executor": "mock",
-        "mock": true,
-        "steps": [
-          {
-            "index": 0,
-            "id": "create",
-            "canonicalId": "tracker.issue.create",
-            "sideEffect": true
-          },
-          {
-            "index": 1,
-            "id": "label",
-            "canonicalId": "tracker.issue.label",
-            "sideEffect": true
-          },
-          {
-            "index": 2,
-            "id": "close",
-            "canonicalId": "tracker.issue.update",
-            "sideEffect": true
-          }
-        ],
-        "outcome": "failed",
-        "workflow": {
-          "id": "demo-tracker",
-          "name": "Create ticket, label it, close it",
-          "executor": "mock",
-          "inputs": {
-            "title": "Checkout crashes on empty cart",
-            "label": "bug",
-            "finalState": "done"
-          },
-          "steps": [
-            {
-              "id": "create",
-              "canonical_id": "tracker.issue.create",
-              "input": {
-                "body": {
-                  "title": "{{inputs.title}}"
-                }
-              },
-              "sideEffect": true,
-              "compensate": {
-                "canonical_id": "tracker.issue.delete",
-                "input": {
-                  "path": {
-                    "id": "{{steps.create.output.id}}"
-                  }
-                }
-              }
-            },
-            {
-              "id": "label",
-              "canonical_id": "tracker.issue.label",
-              "input": {
-                "path": {
-                  "id": "{{steps.create.output.id}}"
-                },
-                "body": {
-                  "label": "{{inputs.label}}"
-                }
-              },
-              "sideEffect": true,
-              "compensate": {
-                "canonical_id": "tracker.issue.unlabel",
-                "input": {
-                  "path": {
-                    "id": "{{steps.create.output.id}}"
-                  },
-                  "body": {
-                    "label": "{{inputs.label}}"
-                  }
-                }
-              }
-            },
-            {
-              "id": "close",
-              "canonical_id": "tracker.issue.update",
-              "input": {
-                "path": {
-                  "id": "{{steps.create.output.id}}"
-                },
-                "body": {
-                  "state": "{{inputs.finalState}}"
-                }
-              },
-              "sideEffect": true
-            }
-          ]
-        },
-        "inputs": {
-          "title": "Checkout crashes on empty cart",
-          "label": "bug",
-          "finalState": "done"
-        },
-        "failedStep": 2,
-        "executorCalls": 3,
-        "injectedSteps": 0
-      },
-      "snapshots": [
-        {
-          "schema": 1,
-          "runId": "r_EqmSja",
-          "workflowId": "demo-tracker",
-          "seq": 0,
-          "stepIndex": 0,
-          "stepId": "create",
-          "canonicalId": "tracker.issue.create",
-          "startedAt": "2026-11-02T17:16:50.013Z",
-          "durationMs": 1,
-          "input": {
-            "body": {
-              "title": "{{inputs.title}}"
-            }
-          },
-          "resolvedInput": {
-            "body": {
-              "title": "Checkout crashes on empty cart"
-            }
-          },
-          "status": "ok",
-          "output": {
-            "id": 1,
-            "title": "Checkout crashes on empty cart",
-            "state": "open",
-            "labels": [],
-            "created_at": "2026-11-02T17:16:50.014Z"
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "done"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.014Z"
-                }
-              }
-            }
-          },
-          "prevHash": null,
-          "hash": "d915a42afa82e912781cb23d358541188f98cee3f96f4a48fb67bdb6874742cd"
-        },
-        {
-          "schema": 1,
-          "runId": "r_EqmSja",
-          "workflowId": "demo-tracker",
-          "seq": 1,
-          "stepIndex": 1,
-          "stepId": "label",
-          "canonicalId": "tracker.issue.label",
-          "startedAt": "2026-11-02T17:16:50.015Z",
-          "durationMs": 0,
-          "input": {
-            "path": {
-              "id": "{{steps.create.output.id}}"
-            },
-            "body": {
-              "label": "{{inputs.label}}"
-            }
-          },
-          "resolvedInput": {
-            "path": {
-              "id": 1
-            },
-            "body": {
-              "label": "bug"
-            }
-          },
-          "status": "ok",
-          "output": {
-            "id": 1,
-            "labels": [
-              "bug"
-            ]
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "done"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.014Z"
-                }
-              },
-              "label": {
-                "input": {
-                  "path": {
-                    "id": 1
-                  },
-                  "body": {
-                    "label": "bug"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "labels": [
-                    "bug"
-                  ]
-                }
-              }
-            }
-          },
-          "prevHash": "d915a42afa82e912781cb23d358541188f98cee3f96f4a48fb67bdb6874742cd",
-          "hash": "d7b5d632855112048f83bf75806653acd0061f6cbb05d9f956e7f05a402b45e4"
-        },
-        {
-          "schema": 1,
-          "runId": "r_EqmSja",
-          "workflowId": "demo-tracker",
-          "seq": 2,
-          "stepIndex": 2,
-          "stepId": "close",
-          "canonicalId": "tracker.issue.update",
-          "startedAt": "2026-11-02T17:16:50.015Z",
-          "durationMs": 0,
-          "input": {
-            "path": {
-              "id": "{{steps.create.output.id}}"
-            },
-            "body": {
-              "state": "{{inputs.finalState}}"
-            }
-          },
-          "resolvedInput": {
-            "path": {
-              "id": 1
-            },
-            "body": {
-              "state": "done"
-            }
-          },
-          "status": "error",
-          "error": {
-            "category": "validation",
-            "message": "invalid_state: 'done' is not one of open,closed",
-            "retryable": false,
-            "suggestedAction": "use open or closed",
-            "raw": {
-              "status": 422
-            }
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "done"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.014Z"
-                }
-              },
-              "label": {
-                "input": {
-                  "path": {
-                    "id": 1
-                  },
-                  "body": {
-                    "label": "bug"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "labels": [
-                    "bug"
-                  ]
-                }
-              }
-            }
-          },
-          "prevHash": "d7b5d632855112048f83bf75806653acd0061f6cbb05d9f956e7f05a402b45e4",
-          "hash": "fff0e74a118e082f28125c91d25e1b44be7b8a677a52fa35203cc28bf9063e95"
+ "source": "captured from a real run against the GitHub REST API (RidhimaKulashriz/SWTTM) through the swy-tm debugger",
+ "generatedAt": "2026-11-03T14:40:31.729019Z",
+ "runs": [
+  {
+   "manifest": {
+    "runId": "r_2sdX84",
+    "workflowId": "github-issue",
+    "createdAt": "2026-11-03T14:40:17.272Z",
+    "executor": "github",
+    "mock": false,
+    "steps": [
+     {
+      "index": 0,
+      "id": "create",
+      "canonicalId": "github.issue.create",
+      "sideEffect": true
+     },
+     {
+      "index": 1,
+      "id": "label",
+      "canonicalId": "github.issue.labels.create",
+      "sideEffect": true
+     },
+     {
+      "index": 2,
+      "id": "close",
+      "canonicalId": "github.issue.update",
+      "sideEffect": true
+     }
+    ],
+    "outcome": "failed",
+    "workflow": {
+     "id": "github-issue",
+     "name": "GitHub issue lifecycle: create issue, add label, set state (live GitHub API)",
+     "executor": "github",
+     "inputs": {
+      "owner": "OWNER",
+      "repo": "REPO",
+      "title": "swy-tm test issue",
+      "label": "bug",
+      "finalState": "closed"
+     },
+     "steps": [
+      {
+       "id": "create",
+       "canonical_id": "github.issue.create",
+       "input": {
+        "owner": "{{inputs.owner}}",
+        "repo": "{{inputs.repo}}",
+        "body": {
+         "title": "{{inputs.title}}"
         }
-      ]
+       },
+       "sideEffect": true,
+       "compensate": {
+        "canonical_id": "github.issue.update",
+        "input": {
+         "owner": "{{inputs.owner}}",
+         "repo": "{{inputs.repo}}",
+         "issue_number": "{{steps.create.output.number}}",
+         "body": {
+          "state": "closed"
+         }
+        }
+       }
+      },
+      {
+       "id": "label",
+       "canonical_id": "github.issue.labels.create",
+       "input": {
+        "owner": "{{inputs.owner}}",
+        "repo": "{{inputs.repo}}",
+        "issue_number": "{{steps.create.output.number}}",
+        "body": {
+         "labels": [
+          "{{inputs.label}}"
+         ]
+        }
+       },
+       "sideEffect": true,
+       "compensate": {
+        "canonical_id": "github.issue.labels.remove",
+        "input": {
+         "owner": "{{inputs.owner}}",
+         "repo": "{{inputs.repo}}",
+         "issue_number": "{{steps.create.output.number}}",
+         "name": "{{inputs.label}}"
+        }
+       }
+      },
+      {
+       "id": "close",
+       "canonical_id": "github.issue.update",
+       "input": {
+        "owner": "{{inputs.owner}}",
+        "repo": "{{inputs.repo}}",
+        "issue_number": "{{steps.create.output.number}}",
+        "body": {
+         "state": "{{inputs.finalState}}"
+        }
+       },
+       "sideEffect": true,
+       "compensate": {
+        "canonical_id": "github.issue.update",
+        "input": {
+         "owner": "{{inputs.owner}}",
+         "repo": "{{inputs.repo}}",
+         "issue_number": "{{steps.create.output.number}}",
+         "body": {
+          "state": "open"
+         }
+        }
+       }
+      }
+     ]
+    },
+    "inputs": {
+     "owner": "RidhimaKulashriz",
+     "repo": "SWTTM",
+     "title": "Checkout page fails on submit (swy-tm sample)",
+     "label": "bug",
+     "finalState": "pending"
+    },
+    "failedStep": 2,
+    "overrides": [
+     "inputs.owner=\"RidhimaKulashriz\"",
+     "inputs.repo=\"SWTTM\"",
+     "inputs.title=\"Checkout page fails on submit (swy-tm sample)\"",
+     "inputs.label=\"bug\"",
+     "inputs.finalState=\"pending\""
+    ],
+    "executorCalls": 3,
+    "injectedSteps": 0
+   },
+   "snapshots": [
+    {
+     "schema": 1,
+     "runId": "r_2sdX84",
+     "workflowId": "github-issue",
+     "seq": 0,
+     "stepIndex": 0,
+     "stepId": "create",
+     "canonicalId": "github.issue.create",
+     "startedAt": "2026-11-03T14:40:16.101Z",
+     "durationMs": 389,
+     "input": {
+      "owner": "{{inputs.owner}}",
+      "repo": "{{inputs.repo}}",
+      "body": {
+       "title": "{{inputs.title}}"
+      }
+     },
+     "resolvedInput": {
+      "owner": "RidhimaKulashriz",
+      "repo": "SWTTM",
+      "body": {
+       "title": "Checkout page fails on submit (swy-tm sample)"
+      }
+     },
+     "status": "ok",
+     "output": {
+      "id": 6184837613,
+      "number": 1,
+      "title": "Checkout page fails on submit (swy-tm sample)",
+      "state": "open",
+      "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+      "updated_at": "2026-11-03T14:40:16Z",
+      "labels": []
+     },
+     "sideEffect": true,
+     "executor": "github",
+     "mock": false,
+     "contextAfter": {
+      "inputs": {
+       "owner": "RidhimaKulashriz",
+       "repo": "SWTTM",
+       "title": "Checkout page fails on submit (swy-tm sample)",
+       "label": "bug",
+       "finalState": "pending"
+      },
+      "steps": {
+       "create": {
+        "input": {
+         "owner": "RidhimaKulashriz",
+         "repo": "SWTTM",
+         "body": {
+          "title": "Checkout page fails on submit (swy-tm sample)"
+         }
+        },
+        "output": {
+         "id": 6184837613,
+         "number": 1,
+         "title": "Checkout page fails on submit (swy-tm sample)",
+         "state": "open",
+         "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+         "updated_at": "2026-11-03T14:40:16Z",
+         "labels": []
+        }
+       }
+      }
+     },
+     "prevHash": null,
+     "hash": "c06fa51e3880cf310ff62928eee9651bcc527f3177e66c412910c7a911d3caa3"
     },
     {
-      "manifest": {
-        "runId": "r_UxFJR2",
-        "workflowId": "demo-tracker",
-        "createdAt": "2026-11-02T17:16:50.019Z",
-        "executor": "mock",
-        "mock": true,
-        "steps": [
-          {
-            "index": 0,
-            "id": "create",
-            "canonicalId": "tracker.issue.create",
-            "sideEffect": true
-          },
-          {
-            "index": 1,
-            "id": "label",
-            "canonicalId": "tracker.issue.label",
-            "sideEffect": true
-          },
-          {
-            "index": 2,
-            "id": "close",
-            "canonicalId": "tracker.issue.update",
-            "sideEffect": true
-          }
-        ],
-        "outcome": "ok",
-        "workflow": {
-          "id": "demo-tracker",
-          "name": "Create ticket, label it, close it",
-          "executor": "mock",
-          "inputs": {
-            "title": "Checkout crashes on empty cart",
-            "label": "bug",
-            "finalState": "done"
-          },
-          "steps": [
-            {
-              "id": "create",
-              "canonical_id": "tracker.issue.create",
-              "input": {
-                "body": {
-                  "title": "{{inputs.title}}"
-                }
-              },
-              "sideEffect": true,
-              "compensate": {
-                "canonical_id": "tracker.issue.delete",
-                "input": {
-                  "path": {
-                    "id": "{{steps.create.output.id}}"
-                  }
-                }
-              }
-            },
-            {
-              "id": "label",
-              "canonical_id": "tracker.issue.label",
-              "input": {
-                "path": {
-                  "id": "{{steps.create.output.id}}"
-                },
-                "body": {
-                  "label": "{{inputs.label}}"
-                }
-              },
-              "sideEffect": true,
-              "compensate": {
-                "canonical_id": "tracker.issue.unlabel",
-                "input": {
-                  "path": {
-                    "id": "{{steps.create.output.id}}"
-                  },
-                  "body": {
-                    "label": "{{inputs.label}}"
-                  }
-                }
-              }
-            },
-            {
-              "id": "close",
-              "canonical_id": "tracker.issue.update",
-              "input": {
-                "path": {
-                  "id": "{{steps.create.output.id}}"
-                },
-                "body": {
-                  "state": "{{inputs.finalState}}"
-                }
-              },
-              "sideEffect": true
-            }
-          ]
-        },
-        "inputs": {
-          "title": "Checkout crashes on empty cart",
-          "label": "bug",
-          "finalState": "closed"
-        },
-        "parentRunId": "r_EqmSja",
-        "replayFromStep": 2,
-        "overrides": [
-          "inputs.finalState=closed"
-        ],
-        "executorCalls": 1,
-        "injectedSteps": 2
-      },
-      "snapshots": [
-        {
-          "schema": 1,
-          "runId": "r_UxFJR2",
-          "workflowId": "demo-tracker",
-          "seq": 0,
-          "stepIndex": 0,
-          "stepId": "create",
-          "canonicalId": "tracker.issue.create",
-          "startedAt": "2026-11-02T17:16:50.018Z",
-          "durationMs": 0,
-          "input": {
-            "body": {
-              "title": "{{inputs.title}}"
-            }
-          },
-          "resolvedInput": {
-            "body": {
-              "title": "Checkout crashes on empty cart"
-            }
-          },
-          "status": "injected",
-          "output": {
-            "id": 1,
-            "title": "Checkout crashes on empty cart",
-            "state": "open",
-            "labels": [],
-            "created_at": "2026-11-02T17:16:50.014Z"
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "closed"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.014Z"
-                }
-              }
-            }
-          },
-          "prevHash": null,
-          "hash": "0e116920f765e1cce16d3fe54cef163b94db62b05d5a665f8d580ebdf2d71808"
-        },
-        {
-          "schema": 1,
-          "runId": "r_UxFJR2",
-          "workflowId": "demo-tracker",
-          "seq": 1,
-          "stepIndex": 1,
-          "stepId": "label",
-          "canonicalId": "tracker.issue.label",
-          "startedAt": "2026-11-02T17:16:50.018Z",
-          "durationMs": 0,
-          "input": {
-            "path": {
-              "id": "{{steps.create.output.id}}"
-            },
-            "body": {
-              "label": "{{inputs.label}}"
-            }
-          },
-          "resolvedInput": {
-            "path": {
-              "id": 1
-            },
-            "body": {
-              "label": "bug"
-            }
-          },
-          "status": "injected",
-          "output": {
-            "id": 1,
-            "labels": [
-              "bug"
-            ]
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "closed"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.014Z"
-                }
-              },
-              "label": {
-                "input": {
-                  "path": {
-                    "id": 1
-                  },
-                  "body": {
-                    "label": "bug"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "labels": [
-                    "bug"
-                  ]
-                }
-              }
-            }
-          },
-          "prevHash": "0e116920f765e1cce16d3fe54cef163b94db62b05d5a665f8d580ebdf2d71808",
-          "hash": "8f8d89e84271681d83014e3ac0f3b3eab60f00b68a7c88bf33e4be30f73b4e70"
-        },
-        {
-          "schema": 1,
-          "runId": "r_UxFJR2",
-          "workflowId": "demo-tracker",
-          "seq": 2,
-          "stepIndex": 2,
-          "stepId": "close",
-          "canonicalId": "tracker.issue.update",
-          "startedAt": "2026-11-02T17:16:50.019Z",
-          "durationMs": 0,
-          "input": {
-            "path": {
-              "id": "{{steps.create.output.id}}"
-            },
-            "body": {
-              "state": "{{inputs.finalState}}"
-            }
-          },
-          "resolvedInput": {
-            "path": {
-              "id": 1
-            },
-            "body": {
-              "state": "closed"
-            }
-          },
-          "status": "ok",
-          "output": {
-            "id": 1,
-            "title": "Checkout crashes on empty cart",
-            "state": "closed",
-            "labels": [
-              "bug"
-            ],
-            "updated_at": "2026-11-02T17:16:50.019Z"
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "closed"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.014Z"
-                }
-              },
-              "label": {
-                "input": {
-                  "path": {
-                    "id": 1
-                  },
-                  "body": {
-                    "label": "bug"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "labels": [
-                    "bug"
-                  ]
-                }
-              },
-              "close": {
-                "input": {
-                  "path": {
-                    "id": 1
-                  },
-                  "body": {
-                    "state": "closed"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "closed",
-                  "labels": [
-                    "bug"
-                  ],
-                  "updated_at": "2026-11-02T17:16:50.019Z"
-                }
-              }
-            }
-          },
-          "prevHash": "8f8d89e84271681d83014e3ac0f3b3eab60f00b68a7c88bf33e4be30f73b4e70",
-          "hash": "1fefbe60fb03fc2e2790cffed04efff0d513c3cae873fa40ed5325b5cacda696"
-        }
+     "schema": 1,
+     "runId": "r_2sdX84",
+     "workflowId": "github-issue",
+     "seq": 1,
+     "stepIndex": 1,
+     "stepId": "label",
+     "canonicalId": "github.issue.labels.create",
+     "startedAt": "2026-11-03T14:40:16.491Z",
+     "durationMs": 781,
+     "input": {
+      "owner": "{{inputs.owner}}",
+      "repo": "{{inputs.repo}}",
+      "issue_number": "{{steps.create.output.number}}",
+      "body": {
+       "labels": [
+        "{{inputs.label}}"
+       ]
+      }
+     },
+     "resolvedInput": {
+      "owner": "RidhimaKulashriz",
+      "repo": "SWTTM",
+      "issue_number": 1,
+      "body": {
+       "labels": [
+        "bug"
+       ]
+      }
+     },
+     "status": "ok",
+     "output": {
+      "number": 1,
+      "labels": [
+       "bug"
       ]
+     },
+     "sideEffect": true,
+     "executor": "github",
+     "mock": false,
+     "contextAfter": {
+      "inputs": {
+       "owner": "RidhimaKulashriz",
+       "repo": "SWTTM",
+       "title": "Checkout page fails on submit (swy-tm sample)",
+       "label": "bug",
+       "finalState": "pending"
+      },
+      "steps": {
+       "create": {
+        "input": {
+         "owner": "RidhimaKulashriz",
+         "repo": "SWTTM",
+         "body": {
+          "title": "Checkout page fails on submit (swy-tm sample)"
+         }
+        },
+        "output": {
+         "id": 6184837613,
+         "number": 1,
+         "title": "Checkout page fails on submit (swy-tm sample)",
+         "state": "open",
+         "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+         "updated_at": "2026-11-03T14:40:16Z",
+         "labels": []
+        }
+       },
+       "label": {
+        "input": {
+         "owner": "RidhimaKulashriz",
+         "repo": "SWTTM",
+         "issue_number": 1,
+         "body": {
+          "labels": [
+           "bug"
+          ]
+         }
+        },
+        "output": {
+         "number": 1,
+         "labels": [
+          "bug"
+         ]
+        }
+       }
+      }
+     },
+     "prevHash": "c06fa51e3880cf310ff62928eee9651bcc527f3177e66c412910c7a911d3caa3",
+     "hash": "b73eccd9a684adb00734b9052917db7fbab8b7b768fbf6b6761ea6c6509a154a"
     },
     {
-      "manifest": {
-        "runId": "r_oc7GaF",
-        "workflowId": "demo-tracker",
-        "createdAt": "2026-11-02T17:16:50.023Z",
-        "executor": "mock",
-        "mock": true,
-        "steps": [
-          {
-            "index": 0,
-            "id": "create",
-            "canonicalId": "tracker.issue.create",
-            "sideEffect": true
-          },
-          {
-            "index": 1,
-            "id": "label",
-            "canonicalId": "tracker.issue.label",
-            "sideEffect": true
-          },
-          {
-            "index": 2,
-            "id": "close",
-            "canonicalId": "tracker.issue.update",
-            "sideEffect": true
-          }
-        ],
-        "outcome": "ok",
-        "workflow": {
-          "id": "demo-tracker",
-          "name": "Create ticket, label it, close it",
-          "executor": "mock",
-          "inputs": {
-            "title": "Checkout crashes on empty cart",
-            "label": "bug",
-            "finalState": "done"
-          },
-          "steps": [
-            {
-              "id": "create",
-              "canonical_id": "tracker.issue.create",
-              "input": {
-                "body": {
-                  "title": "{{inputs.title}}"
-                }
-              },
-              "sideEffect": true,
-              "compensate": {
-                "canonical_id": "tracker.issue.delete",
-                "input": {
-                  "path": {
-                    "id": "{{steps.create.output.id}}"
-                  }
-                }
-              }
-            },
-            {
-              "id": "label",
-              "canonical_id": "tracker.issue.label",
-              "input": {
-                "path": {
-                  "id": "{{steps.create.output.id}}"
-                },
-                "body": {
-                  "label": "{{inputs.label}}"
-                }
-              },
-              "sideEffect": true,
-              "compensate": {
-                "canonical_id": "tracker.issue.unlabel",
-                "input": {
-                  "path": {
-                    "id": "{{steps.create.output.id}}"
-                  },
-                  "body": {
-                    "label": "{{inputs.label}}"
-                  }
-                }
-              }
-            },
-            {
-              "id": "close",
-              "canonical_id": "tracker.issue.update",
-              "input": {
-                "path": {
-                  "id": "{{steps.create.output.id}}"
-                },
-                "body": {
-                  "state": "{{inputs.finalState}}"
-                }
-              },
-              "sideEffect": true
-            }
-          ]
-        },
-        "inputs": {
-          "title": "Checkout crashes on empty cart",
-          "label": "bug",
-          "finalState": "closed"
-        },
-        "parentRunId": "r_EqmSja",
-        "replayFromStep": 0,
-        "overrides": [
-          "inputs.finalState=closed"
-        ],
-        "executorCalls": 5,
-        "injectedSteps": 0
+     "schema": 1,
+     "runId": "r_2sdX84",
+     "workflowId": "github-issue",
+     "seq": 2,
+     "stepIndex": 2,
+     "stepId": "close",
+     "canonicalId": "github.issue.update",
+     "startedAt": "2026-11-03T14:40:17.272Z",
+     "durationMs": 0,
+     "input": {
+      "owner": "{{inputs.owner}}",
+      "repo": "{{inputs.repo}}",
+      "issue_number": "{{steps.create.output.number}}",
+      "body": {
+       "state": "{{inputs.finalState}}"
+      }
+     },
+     "resolvedInput": {
+      "owner": "RidhimaKulashriz",
+      "repo": "SWTTM",
+      "issue_number": 1,
+      "body": {
+       "state": "pending"
+      }
+     },
+     "status": "error",
+     "error": {
+      "category": "validation",
+      "message": "GitHub issue state must be 'open' or 'closed'.",
+      "retryable": false
+     },
+     "sideEffect": true,
+     "executor": "github",
+     "mock": false,
+     "contextAfter": {
+      "inputs": {
+       "owner": "RidhimaKulashriz",
+       "repo": "SWTTM",
+       "title": "Checkout page fails on submit (swy-tm sample)",
+       "label": "bug",
+       "finalState": "pending"
       },
-      "snapshots": [
-        {
-          "schema": 1,
-          "runId": "r_oc7GaF",
-          "workflowId": "demo-tracker",
-          "seq": 0,
-          "stepIndex": 1,
-          "stepId": "label:compensate",
-          "canonicalId": "tracker.issue.unlabel",
-          "startedAt": "2026-11-02T17:16:50.021Z",
-          "durationMs": 0,
-          "input": {
-            "path": {
-              "id": "{{steps.create.output.id}}"
-            },
-            "body": {
-              "label": "{{inputs.label}}"
-            }
-          },
-          "resolvedInput": {
-            "path": {
-              "id": 1
-            },
-            "body": {
-              "label": "bug"
-            }
-          },
-          "status": "ok",
-          "output": {
-            "id": 1,
-            "labels": []
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "done"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.014Z"
-                }
-              },
-              "label": {
-                "input": {
-                  "path": {
-                    "id": 1
-                  },
-                  "body": {
-                    "label": "bug"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "labels": [
-                    "bug"
-                  ]
-                }
-              }
-            }
-          },
-          "prevHash": null,
-          "hash": "b20643a274005a5731e9a614f180d2686215dc71a8d7840442973e505471f791"
+      "steps": {
+       "create": {
+        "input": {
+         "owner": "RidhimaKulashriz",
+         "repo": "SWTTM",
+         "body": {
+          "title": "Checkout page fails on submit (swy-tm sample)"
+         }
         },
-        {
-          "schema": 1,
-          "runId": "r_oc7GaF",
-          "workflowId": "demo-tracker",
-          "seq": 1,
-          "stepIndex": 0,
-          "stepId": "create:compensate",
-          "canonicalId": "tracker.issue.delete",
-          "startedAt": "2026-11-02T17:16:50.022Z",
-          "durationMs": 0,
-          "input": {
-            "path": {
-              "id": "{{steps.create.output.id}}"
-            }
-          },
-          "resolvedInput": {
-            "path": {
-              "id": 1
-            }
-          },
-          "status": "ok",
-          "output": {
-            "id": 1,
-            "deleted": true
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "done"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 1,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.014Z"
-                }
-              }
-            }
-          },
-          "prevHash": "b20643a274005a5731e9a614f180d2686215dc71a8d7840442973e505471f791",
-          "hash": "1b0fa668985dacb49ab0d56c27fc96f862923cdf9a01fb8e8296b32beb92a6b9"
-        },
-        {
-          "schema": 1,
-          "runId": "r_oc7GaF",
-          "workflowId": "demo-tracker",
-          "seq": 2,
-          "stepIndex": 0,
-          "stepId": "create",
-          "canonicalId": "tracker.issue.create",
-          "startedAt": "2026-11-02T17:16:50.022Z",
-          "durationMs": 0,
-          "input": {
-            "body": {
-              "title": "{{inputs.title}}"
-            }
-          },
-          "resolvedInput": {
-            "body": {
-              "title": "Checkout crashes on empty cart"
-            }
-          },
-          "status": "ok",
-          "output": {
-            "id": 2,
-            "title": "Checkout crashes on empty cart",
-            "state": "open",
-            "labels": [],
-            "created_at": "2026-11-02T17:16:50.022Z"
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "closed"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 2,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.022Z"
-                }
-              }
-            }
-          },
-          "prevHash": "1b0fa668985dacb49ab0d56c27fc96f862923cdf9a01fb8e8296b32beb92a6b9",
-          "hash": "c17adf52a1dd499162cc8eb161e301077f6fcb536e4c521bbca59a92617339f3"
-        },
-        {
-          "schema": 1,
-          "runId": "r_oc7GaF",
-          "workflowId": "demo-tracker",
-          "seq": 3,
-          "stepIndex": 1,
-          "stepId": "label",
-          "canonicalId": "tracker.issue.label",
-          "startedAt": "2026-11-02T17:16:50.022Z",
-          "durationMs": 0,
-          "input": {
-            "path": {
-              "id": "{{steps.create.output.id}}"
-            },
-            "body": {
-              "label": "{{inputs.label}}"
-            }
-          },
-          "resolvedInput": {
-            "path": {
-              "id": 2
-            },
-            "body": {
-              "label": "bug"
-            }
-          },
-          "status": "ok",
-          "output": {
-            "id": 2,
-            "labels": [
-              "bug"
-            ]
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "closed"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 2,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.022Z"
-                }
-              },
-              "label": {
-                "input": {
-                  "path": {
-                    "id": 2
-                  },
-                  "body": {
-                    "label": "bug"
-                  }
-                },
-                "output": {
-                  "id": 2,
-                  "labels": [
-                    "bug"
-                  ]
-                }
-              }
-            }
-          },
-          "prevHash": "c17adf52a1dd499162cc8eb161e301077f6fcb536e4c521bbca59a92617339f3",
-          "hash": "1af65fde0830a9e0fc8c8fa57c18e3d689282181a97d1eb013f6ba44d068c8c0"
-        },
-        {
-          "schema": 1,
-          "runId": "r_oc7GaF",
-          "workflowId": "demo-tracker",
-          "seq": 4,
-          "stepIndex": 2,
-          "stepId": "close",
-          "canonicalId": "tracker.issue.update",
-          "startedAt": "2026-11-02T17:16:50.023Z",
-          "durationMs": 0,
-          "input": {
-            "path": {
-              "id": "{{steps.create.output.id}}"
-            },
-            "body": {
-              "state": "{{inputs.finalState}}"
-            }
-          },
-          "resolvedInput": {
-            "path": {
-              "id": 2
-            },
-            "body": {
-              "state": "closed"
-            }
-          },
-          "status": "ok",
-          "output": {
-            "id": 2,
-            "title": "Checkout crashes on empty cart",
-            "state": "closed",
-            "labels": [
-              "bug"
-            ],
-            "updated_at": "2026-11-02T17:16:50.023Z"
-          },
-          "sideEffect": true,
-          "executor": "mock",
-          "mock": true,
-          "contextAfter": {
-            "inputs": {
-              "title": "Checkout crashes on empty cart",
-              "label": "bug",
-              "finalState": "closed"
-            },
-            "steps": {
-              "create": {
-                "input": {
-                  "body": {
-                    "title": "Checkout crashes on empty cart"
-                  }
-                },
-                "output": {
-                  "id": 2,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "open",
-                  "labels": [],
-                  "created_at": "2026-11-02T17:16:50.022Z"
-                }
-              },
-              "label": {
-                "input": {
-                  "path": {
-                    "id": 2
-                  },
-                  "body": {
-                    "label": "bug"
-                  }
-                },
-                "output": {
-                  "id": 2,
-                  "labels": [
-                    "bug"
-                  ]
-                }
-              },
-              "close": {
-                "input": {
-                  "path": {
-                    "id": 2
-                  },
-                  "body": {
-                    "state": "closed"
-                  }
-                },
-                "output": {
-                  "id": 2,
-                  "title": "Checkout crashes on empty cart",
-                  "state": "closed",
-                  "labels": [
-                    "bug"
-                  ],
-                  "updated_at": "2026-11-02T17:16:50.023Z"
-                }
-              }
-            }
-          },
-          "prevHash": "1af65fde0830a9e0fc8c8fa57c18e3d689282181a97d1eb013f6ba44d068c8c0",
-          "hash": "4b3b4500dae78b0b2d09ab9833b9ec59f356d47b15aaab1fdcc048629feb55b0"
+        "output": {
+         "id": 6184837613,
+         "number": 1,
+         "title": "Checkout page fails on submit (swy-tm sample)",
+         "state": "open",
+         "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+         "updated_at": "2026-11-03T14:40:16Z",
+         "labels": []
         }
-      ]
+       },
+       "label": {
+        "input": {
+         "owner": "RidhimaKulashriz",
+         "repo": "SWTTM",
+         "issue_number": 1,
+         "body": {
+          "labels": [
+           "bug"
+          ]
+         }
+        },
+        "output": {
+         "number": 1,
+         "labels": [
+          "bug"
+         ]
+        }
+       }
+      }
+     },
+     "prevHash": "b73eccd9a684adb00734b9052917db7fbab8b7b768fbf6b6761ea6c6509a154a",
+     "hash": "7ece2e3ea16ee235f490ea2fc389fda989ed1db1ef4cb3f5d7a115e8b0411b58"
     }
-  ],
-  "ledger": {
-    "created": 2,
-    "deleted": 1,
-    "labeled": 2,
-    "unlabeled": 1,
-    "updated": 2
+   ]
+  },
+  {
+   "manifest": {
+    "runId": "r_D8FTkJ",
+    "workflowId": "github-issue",
+    "createdAt": "2026-11-03T14:40:18.213Z",
+    "executor": "github",
+    "mock": false,
+    "steps": [
+     {
+      "index": 0,
+      "id": "create",
+      "canonicalId": "github.issue.create",
+      "sideEffect": true
+     },
+     {
+      "index": 1,
+      "id": "label",
+      "canonicalId": "github.issue.labels.create",
+      "sideEffect": true
+     },
+     {
+      "index": 2,
+      "id": "close",
+      "canonicalId": "github.issue.update",
+      "sideEffect": true
+     }
+    ],
+    "outcome": "ok",
+    "workflow": {
+     "id": "github-issue",
+     "name": "GitHub issue lifecycle: create issue, add label, set state (live GitHub API)",
+     "steps": [
+      {
+       "id": "create",
+       "input": {
+        "body": {
+         "title": "{{inputs.title}}"
+        },
+        "repo": "{{inputs.repo}}",
+        "owner": "{{inputs.owner}}"
+       },
+       "compensate": {
+        "input": {
+         "body": {
+          "state": "closed"
+         },
+         "repo": "{{inputs.repo}}",
+         "owner": "{{inputs.owner}}",
+         "issue_number": "{{steps.create.output.number}}"
+        },
+        "canonical_id": "github.issue.update"
+       },
+       "sideEffect": true,
+       "canonical_id": "github.issue.create"
+      },
+      {
+       "id": "label",
+       "input": {
+        "body": {
+         "labels": [
+          "{{inputs.label}}"
+         ]
+        },
+        "repo": "{{inputs.repo}}",
+        "owner": "{{inputs.owner}}",
+        "issue_number": "{{steps.create.output.number}}"
+       },
+       "compensate": {
+        "input": {
+         "name": "{{inputs.label}}",
+         "repo": "{{inputs.repo}}",
+         "owner": "{{inputs.owner}}",
+         "issue_number": "{{steps.create.output.number}}"
+        },
+        "canonical_id": "github.issue.labels.remove"
+       },
+       "sideEffect": true,
+       "canonical_id": "github.issue.labels.create"
+      },
+      {
+       "id": "close",
+       "input": {
+        "body": {
+         "state": "{{inputs.finalState}}"
+        },
+        "repo": "{{inputs.repo}}",
+        "owner": "{{inputs.owner}}",
+        "issue_number": "{{steps.create.output.number}}"
+       },
+       "compensate": {
+        "input": {
+         "body": {
+          "state": "open"
+         },
+         "repo": "{{inputs.repo}}",
+         "owner": "{{inputs.owner}}",
+         "issue_number": "{{steps.create.output.number}}"
+        },
+        "canonical_id": "github.issue.update"
+       },
+       "sideEffect": true,
+       "canonical_id": "github.issue.update"
+      }
+     ],
+     "inputs": {
+      "repo": "REPO",
+      "label": "bug",
+      "owner": "OWNER",
+      "title": "swy-tm test issue",
+      "finalState": "closed"
+     },
+     "executor": "github"
+    },
+    "inputs": {
+     "repo": "SWTTM",
+     "label": "bug",
+     "owner": "RidhimaKulashriz",
+     "title": "Checkout page fails on submit (swy-tm sample)",
+     "finalState": "closed"
+    },
+    "parentRunId": "r_2sdX84",
+    "replayFromStep": 2,
+    "overrides": [
+     "inputs.finalState=closed"
+    ],
+    "executorCalls": 1,
+    "injectedSteps": 2
+   },
+   "snapshots": [
+    {
+     "schema": 1,
+     "runId": "r_D8FTkJ",
+     "workflowId": "github-issue",
+     "seq": 0,
+     "stepIndex": 0,
+     "stepId": "create",
+     "canonicalId": "github.issue.create",
+     "startedAt": "2026-11-03T14:40:17.301Z",
+     "durationMs": 0,
+     "input": {
+      "body": {
+       "title": "{{inputs.title}}"
+      },
+      "repo": "{{inputs.repo}}",
+      "owner": "{{inputs.owner}}"
+     },
+     "resolvedInput": {
+      "body": {
+       "title": "Checkout page fails on submit (swy-tm sample)"
+      },
+      "repo": "SWTTM",
+      "owner": "RidhimaKulashriz"
+     },
+     "status": "injected",
+     "output": {
+      "id": 6184837613,
+      "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+      "state": "open",
+      "title": "Checkout page fails on submit (swy-tm sample)",
+      "labels": [],
+      "number": 1,
+      "updated_at": "2026-11-03T14:40:16Z"
+     },
+     "sideEffect": true,
+     "executor": "github",
+     "mock": false,
+     "contextAfter": {
+      "steps": {
+       "create": {
+        "input": {
+         "body": {
+          "title": "Checkout page fails on submit (swy-tm sample)"
+         },
+         "repo": "SWTTM",
+         "owner": "RidhimaKulashriz"
+        },
+        "output": {
+         "id": 6184837613,
+         "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+         "state": "open",
+         "title": "Checkout page fails on submit (swy-tm sample)",
+         "labels": [],
+         "number": 1,
+         "updated_at": "2026-11-03T14:40:16Z"
+        }
+       }
+      },
+      "inputs": {
+       "repo": "SWTTM",
+       "label": "bug",
+       "owner": "RidhimaKulashriz",
+       "title": "Checkout page fails on submit (swy-tm sample)",
+       "finalState": "closed"
+      }
+     },
+     "prevHash": null,
+     "hash": "c7b535deae728ffe66d65f8a434d80750447955595a8c0b01a632632a661d570"
+    },
+    {
+     "schema": 1,
+     "runId": "r_D8FTkJ",
+     "workflowId": "github-issue",
+     "seq": 1,
+     "stepIndex": 1,
+     "stepId": "label",
+     "canonicalId": "github.issue.labels.create",
+     "startedAt": "2026-11-03T14:40:17.301Z",
+     "durationMs": 0,
+     "input": {
+      "body": {
+       "labels": [
+        "{{inputs.label}}"
+       ]
+      },
+      "repo": "{{inputs.repo}}",
+      "owner": "{{inputs.owner}}",
+      "issue_number": "{{steps.create.output.number}}"
+     },
+     "resolvedInput": {
+      "body": {
+       "labels": [
+        "bug"
+       ]
+      },
+      "repo": "SWTTM",
+      "owner": "RidhimaKulashriz",
+      "issue_number": 1
+     },
+     "status": "injected",
+     "output": {
+      "labels": [
+       "bug"
+      ],
+      "number": 1
+     },
+     "sideEffect": true,
+     "executor": "github",
+     "mock": false,
+     "contextAfter": {
+      "steps": {
+       "label": {
+        "input": {
+         "body": {
+          "labels": [
+           "bug"
+          ]
+         },
+         "repo": "SWTTM",
+         "owner": "RidhimaKulashriz",
+         "issue_number": 1
+        },
+        "output": {
+         "labels": [
+          "bug"
+         ],
+         "number": 1
+        }
+       },
+       "create": {
+        "input": {
+         "body": {
+          "title": "Checkout page fails on submit (swy-tm sample)"
+         },
+         "repo": "SWTTM",
+         "owner": "RidhimaKulashriz"
+        },
+        "output": {
+         "id": 6184837613,
+         "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+         "state": "open",
+         "title": "Checkout page fails on submit (swy-tm sample)",
+         "labels": [],
+         "number": 1,
+         "updated_at": "2026-11-03T14:40:16Z"
+        }
+       }
+      },
+      "inputs": {
+       "repo": "SWTTM",
+       "label": "bug",
+       "owner": "RidhimaKulashriz",
+       "title": "Checkout page fails on submit (swy-tm sample)",
+       "finalState": "closed"
+      }
+     },
+     "prevHash": "c7b535deae728ffe66d65f8a434d80750447955595a8c0b01a632632a661d570",
+     "hash": "417c3412e87d1a57e21d36499be0679b78b97002d61b122c6d1dace6eb5a746c"
+    },
+    {
+     "schema": 1,
+     "runId": "r_D8FTkJ",
+     "workflowId": "github-issue",
+     "seq": 2,
+     "stepIndex": 2,
+     "stepId": "close",
+     "canonicalId": "github.issue.update",
+     "startedAt": "2026-11-03T14:40:17.301Z",
+     "durationMs": 911,
+     "input": {
+      "body": {
+       "state": "{{inputs.finalState}}"
+      },
+      "repo": "{{inputs.repo}}",
+      "owner": "{{inputs.owner}}",
+      "issue_number": "{{steps.create.output.number}}"
+     },
+     "resolvedInput": {
+      "body": {
+       "state": "closed"
+      },
+      "repo": "SWTTM",
+      "owner": "RidhimaKulashriz",
+      "issue_number": 1
+     },
+     "status": "ok",
+     "output": {
+      "id": 6184837613,
+      "number": 1,
+      "title": "Checkout page fails on submit (swy-tm sample)",
+      "state": "closed",
+      "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+      "updated_at": "2026-11-03T14:40:17Z",
+      "labels": [
+       "bug"
+      ]
+     },
+     "sideEffect": true,
+     "executor": "github",
+     "mock": false,
+     "contextAfter": {
+      "steps": {
+       "label": {
+        "input": {
+         "body": {
+          "labels": [
+           "bug"
+          ]
+         },
+         "repo": "SWTTM",
+         "owner": "RidhimaKulashriz",
+         "issue_number": 1
+        },
+        "output": {
+         "labels": [
+          "bug"
+         ],
+         "number": 1
+        }
+       },
+       "create": {
+        "input": {
+         "body": {
+          "title": "Checkout page fails on submit (swy-tm sample)"
+         },
+         "repo": "SWTTM",
+         "owner": "RidhimaKulashriz"
+        },
+        "output": {
+         "id": 6184837613,
+         "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+         "state": "open",
+         "title": "Checkout page fails on submit (swy-tm sample)",
+         "labels": [],
+         "number": 1,
+         "updated_at": "2026-11-03T14:40:16Z"
+        }
+       },
+       "close": {
+        "input": {
+         "body": {
+          "state": "closed"
+         },
+         "repo": "SWTTM",
+         "owner": "RidhimaKulashriz",
+         "issue_number": 1
+        },
+        "output": {
+         "id": 6184837613,
+         "number": 1,
+         "title": "Checkout page fails on submit (swy-tm sample)",
+         "state": "closed",
+         "url": "https://github.com/RidhimaKulashriz/SWTTM/issues/1",
+         "updated_at": "2026-11-03T14:40:17Z",
+         "labels": [
+          "bug"
+         ]
+        }
+       }
+      },
+      "inputs": {
+       "repo": "SWTTM",
+       "label": "bug",
+       "owner": "RidhimaKulashriz",
+       "title": "Checkout page fails on submit (swy-tm sample)",
+       "finalState": "closed"
+      }
+     },
+     "prevHash": "417c3412e87d1a57e21d36499be0679b78b97002d61b122c6d1dace6eb5a746c",
+     "hash": "03a181abe685c8544ade5d77a37eae64022f0968657bb63fa799649e478bcc33"
+    }
+   ]
   }
+ ],
+ "ledger": {
+  "created": 1,
+  "deleted": 0,
+  "labeled": 1,
+  "unlabeled": 0,
+  "updated": 1
+ }
 }

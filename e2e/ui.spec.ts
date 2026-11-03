@@ -138,28 +138,21 @@ test("axe: no serious/critical violations on / and /app", async ({ page }) => {
   }
 });
 
-test("/app: connect form first, example recording is read-only, bad credentials are rejected by GitHub", async ({ page }) => {
+test("/app: shows no sample data before connecting, validates input, bad credentials are rejected by GitHub", async ({ page }) => {
   await quiet(page);
   await page.goto("/app");
-  await expect(page.locator(".banner")).toContainText("EXAMPLE RECORDING");
+  await expect(page.locator(".banner")).toContainText("NOT CONNECTED");
   await expect(page.getByRole("form", { name: "Connect GitHub" })).toBeVisible();
-  await expect(page.locator("#st-0")).toBeVisible();
+  await expect(page.locator("#st-0")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Replay", exact: true })).toBeDisabled();
+  const connect = page.getByRole("button", { name: "Connect", exact: true });
+  await expect(connect).toBeEnabled();
+  await connect.click();
+  await expect(page.getByRole("alert")).toContainText("Paste your GitHub token");
   await page.screenshot({ path: `${SHOTS}/${vp(page)}-app-static.png` });
   await page.getByLabel("GitHub token").fill("ghp_" + "x".repeat(36));
   await page.getByLabel("Repository (owner/name)").fill("someone/nothing");
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await connect.click();
   await expect(page.getByRole("alert")).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator(".banner")).toContainText("EXAMPLE RECORDING");
-});
-
-test("/app keyboard: arrow keys select steps; focus is visible", async ({ page }) => {
-  await quiet(page);
-  await page.goto("/app");
-  await page.waitForTimeout(800);
-  await page.keyboard.press("ArrowDown");
-  await expect(page.locator("#st-1")).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Tab");
-  const outline = await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle);
-  expect(outline).not.toBe("none");
+  await expect(page.locator(".banner")).toContainText("NOT CONNECTED");
 });

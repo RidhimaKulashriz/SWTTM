@@ -7,7 +7,7 @@ import type { ReconcileReport } from "../server/reconcile";
 import { ConnectForm, Launcher, type Launch } from "./Connect";
 import { DiffView, JsonView, TimelineScrubber } from "./components";
 import { api, getConn, loadStoredConn, setConn, type ConnInfo } from "./connection";
-import { demo, type Ledger, type RunData } from "./demo";
+import type { Ledger, RunData } from "./demo";
 import { LiveCheck } from "./LiveCheck";
 
 type Row = { path: string; value: string };
@@ -111,7 +111,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
 
   /* ---- ledger of real changes this account has made ---- */
   const loadLedger = useCallback(async (isConnected: boolean) => {
-    if (!isConnected) return setLedger(demo.ledger);
+    if (!isConnected) return setLedger({ created: 0, deleted: 0, labeled: 0, unlabeled: 0, updated: 0, commented: 0 });
     const extra = ledgerOf(session.current.filter((x) => !serverIds.current.has(x.manifest.runId)));
     if (serverIds.current.size === 0) return setLedger(extra);
     try {
@@ -131,17 +131,16 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
     }
   }, []);
 
-  /* ---- load runs: your saved history + this browser's runs, or the example recording before you connect ---- */
+  /* ---- load runs: your saved history + this browser's runs, nothing at all before you connect (no sample data) ---- */
   const loadRuns = useCallback(
     async (isConnected: boolean, select?: string) => {
       if (!isConnected) {
         serverIds.current = new Set();
-        setRuns(demo.runs.map((x) => x.manifest));
-        const preview = demo.runs.find((x) => x.manifest.runId === (select ?? initialRun)) ?? demo.runs[0];
-        setRunId(preview?.manifest.runId);
-        setData(preview ?? null);
-        setFrom(preview?.manifest.failedStep ?? 0);
-        setStep((st) => Math.min(st, Math.max((preview?.snapshots.length ?? 1) - 1, 0)));
+        setRuns([]);
+        setRunId(undefined);
+        setData(null);
+        setFrom(0);
+        setStep(0);
         setDiff(null);
         setReport(null);
         setLoading(false);
@@ -187,10 +186,10 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
           await loadRuns(false);
           return;
         }
-        setInfo(r.body);
         session.current = [];
         setError("");
         await loadRuns(true);
+        setInfo(r.body);
         setDockOpen(true);
         say(`Connected to ${r.body.repository} as @${r.body.login}`);
       } catch {
@@ -232,6 +231,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
     let cancelled = false;
     (async () => {
       let d: RunData | null = session.current.find((x) => x.manifest.runId === runId) ?? null;
+      if (!d && !serverIds.current.has(runId)) return;
       if (!d) {
         try {
           const r = await api<RunData>(`/api/runs/${encodeURIComponent(runId)}`);
@@ -475,7 +475,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
 
   const m = data?.manifest;
   const planOnly = Boolean(data?.snapshots.some((s) => isPlan(s.output)));
-  const executorLabel = !connected ? "EXAMPLE RECORDING" : planOnly ? "PLAN ONLY" : "GITHUB · LIVE";
+  const executorLabel = planOnly ? "PLAN ONLY" : "GITHUB · LIVE";
   const outUrl = (snap?.output as { url?: unknown } | undefined)?.url;
   const canReplay = connected && !!data && m?.executor === "github";
 
@@ -491,12 +491,6 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
             const selected = e.target.value;
             setRunId(selected);
             setStep(0);
-            if (!connected) {
-              const preview = demo.runs.find((x) => x.manifest.runId === selected) ?? null;
-              setData(preview);
-              setDiff(null);
-              setFrom(preview?.manifest.failedStep ?? 0);
-            }
           }}
           disabled={!runs.length}
         >
@@ -507,7 +501,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
             </option>
           ))}
         </select>
-        {m && <span className={`badge ${connected ? "real" : "example"}`}>{executorLabel}</span>}
+        {m && <span className={`badge real`}>{executorLabel}</span>}
         <span style={{ flex: 1 }} />
         {connected && (
           <button className="btn sm ghost" onClick={() => setDockOpen((o) => !o)} aria-expanded={dockOpen}>
@@ -527,7 +521,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
           ? "Loading…"
           : connected
             ? `LIVE · @${info?.login} · ${info?.repository} — every run below is a real GitHub run saved to your account only.`
-            : "EXAMPLE RECORDING — sample data, not your repository. Connect GitHub to record, replay and verify your own real runs."}
+            : "NOT CONNECTED — paste your own GitHub token and repository below. Nothing is shown until you connect, and every run you make is a real GitHub run."}
       </div>
 
       {(!connected || dockOpen) && (
@@ -583,7 +577,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
           </div>
           {main.length > 0 && <TimelineScrubber steps={main.map((s) => ({ id: s.stepId, status: s.status }))} value={si} onChange={(v) => setStep(Math.round(v))} onCommit={setStep} />}
           <div className="label" style={{ marginTop: 16 }}>
-            Side-effect ledger {connected ? "(your real GitHub changes)" : "(example recording)"}
+            Side-effect ledger (your real GitHub changes)
           </div>
           {ledger && (
             <div className="kv" data-testid="ledger" style={{ marginTop: 6 }}>
@@ -613,7 +607,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
                 <span className="label">canonicalId</span><span>{snap.canonicalId}</span>
                 <span className="label">status</span><span style={{ color: snap.status === "error" ? "var(--alert)" : undefined }}>{snap.status}</span>
                 <span className="label">sideEffect</span><span>{String(snap.sideEffect)}</span>
-                <span className="label">executor</span><span>{!connected ? "example recording" : snap.executor === "github" ? "GitHub REST API (live)" : snap.executor}</span>
+                <span className="label">executor</span><span>{snap.executor === "github" ? "GitHub REST API (live)" : snap.executor}</span>
                 <span className="label">hash</span><span style={{ wordBreak: "break-all" }}>{snap.hash}</span>
                 <span className="label">prevHash</span><span style={{ wordBreak: "break-all" }}>{snap.prevHash ?? "null"}</span>
               </div>
@@ -643,7 +637,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
               </div>
             </>
           ) : (
-            !loading && <div className="label">{connected ? "Run a workflow to inspect its steps." : "Select a step."}</div>
+            !loading && <div className="label">{connected ? "Run a workflow to inspect its steps." : "Connect GitHub above to start."}</div>
           )}
         </section>
 
@@ -657,7 +651,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
               <span className={m.outcome === "ok" ? "okc" : "red"}><b>{m.outcome}</b></span>
             </div>
           )}
-          {!connected && <div className="label" style={{ marginBottom: 10 }}>Connect GitHub to replay. The example recording is read-only.</div>}
+          {!connected && <div className="label" style={{ marginBottom: 10 }}>Connect GitHub to record and replay real runs.</div>}
           <label className="label" htmlFor="from">Replay from step</label>
           <select id="from" value={from} onChange={(e) => setFrom(Number(e.target.value))} style={{ width: "100%", margin: "4px 0 12px" }} disabled={!canReplay}>
             {m?.steps.map((s) => (
