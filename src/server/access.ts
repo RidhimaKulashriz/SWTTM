@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-import { GITHUB_API, GITHUB_TIMEOUT_MS, githubReady } from "../executors/github";
-import { authorizeGitHubUser } from "./github-access";
+import { GITHUB_API, GITHUB_TIMEOUT_MS } from "../executors/github";
 
 /** A GitHub account + repository the visitor proved they can use. The token only lives for the length of a request. */
 export type Connection = {
@@ -27,7 +26,6 @@ export type ConnectionInfo = {
 
 export type Access =
   | { kind: "connection"; ownerKey: string; connection: Connection }
-  | { kind: "owner"; ownerKey: "server" }
   | { kind: "anonymous"; ownerKey: "anonymous" };
 
 export class AccessError extends Error {
@@ -135,7 +133,6 @@ export const CONNECT_REQUIRED = "Connect your GitHub account and repository firs
 /**
  * Who is calling?
  *  - a visitor who sent their own token and repository (verified against GitHub) -> private, per-account history
- *  - the configured server owner (signed in)                                       -> shared owner history
  *  - nobody                                                                        -> anonymous
  */
 export async function resolveAccess(req?: Request): Promise<Access | Response> {
@@ -155,9 +152,7 @@ export async function resolveAccess(req?: Request): Promise<Access | Response> {
       return jsonError("Could not verify the GitHub connection.", 502, "connection_failed");
     }
   }
-  const denied = await authorizeGitHubUser();
-  if (denied) return denied;
-  return process.env.GITHUB_TOKEN && githubReady() ? { kind: "owner", ownerKey: "server" } : { kind: "anonymous", ownerKey: "anonymous" };
+  return { kind: "anonymous", ownerKey: "anonymous" };
 }
 
 export function requireLive(access: Access): Response | null {

@@ -8,7 +8,7 @@ import { listWorkflows, loadNamedWorkflow } from "../core/workflows";
 import { createExecutor, mockLedger } from "../executors/executor";
 import { emptyMockState, rebuildMockState, type MockState } from "../executors/mock";
 import { detectBinary } from "../executors/swytchcode";
-import { GitHubExecutor, githubCredentialsConfigured, githubReady } from "../executors/github";
+import { GitHubExecutor } from "../executors/github";
 import { getStoredRun, listStoredRuns, listStoredRunsWithSnapshots, saveRun } from "../db/runs";
 import { CONNECT_REQUIRED, type Access } from "./access";
 
@@ -77,20 +77,13 @@ export const ReplayBody = z.object({
 });
 
 export function health() {
-  const configured = githubCredentialsConfigured();
   return {
     ok: true,
-    version: "0.2.0",
-    executors: { mock: true, swytchcode: detectBinary() ?? false, github: true },
-    services: {
-      postgres: Boolean(process.env.DATABASE_URL),
-    },
-    github: {
-      /** visitors connect their own token; this only reports the optional server-owned connection */
-      ready: githubReady(),
-      connectYourOwn: true,
-      repository: configured ? `${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}` : null,
-    },
+    version: "0.3.0",
+    executors: { swytchcode: detectBinary() ?? false, github: true },
+    services: { postgres: Boolean(process.env.DATABASE_URL) },
+    /** every visitor connects their own token; nothing is configured on the server */
+    github: { connectYourOwn: true },
   };
 }
 
@@ -196,7 +189,6 @@ function exec(name: "mock" | "swytchcode" | "github", currentStore: Store, acces
       const c = access.connection;
       return new GitHubExecutor({ token: c.token, owner: c.owner, repo: c.repo });
     }
-    if (access.kind === "owner" && githubReady()) return new GitHubExecutor();
     throw new TmError(CONNECT_REQUIRED, 2);
   }
   return createExecutor(name, currentStore, undefined, mockState);

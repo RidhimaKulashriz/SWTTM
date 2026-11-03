@@ -9,10 +9,12 @@ import { DiffView, JsonView, TimelineScrubber } from "./components";
 import { api, getConn, loadStoredConn, setConn, type ConnInfo } from "./connection";
 import type { Ledger, RunData } from "./demo";
 import { LiveCheck } from "./LiveCheck";
+import { planReplay } from "./plan";
+import { ReplayPlanView, SnapshotReader } from "./Values";
 
 type Row = { path: string; value: string };
-type Tab = "Input" | "Resolved input" | "Output" | "Error" | "Context after" | "Raw";
-const TABS: Tab[] = ["Input", "Resolved input", "Output", "Error", "Context after", "Raw"];
+type Tab = "Values" | "Input" | "Resolved input" | "Output" | "Error" | "Context after" | "Raw";
+const TABS: Tab[] = ["Values", "Input", "Resolved input", "Output", "Error", "Context after", "Raw"];
 type LedgerState = Ledger & { commented?: number };
 
 function paths(v: unknown, prefix = ""): string[] {
@@ -76,7 +78,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
   const [runId, setRunId] = useState<string | undefined>(initialRun);
   const [data, setData] = useState<RunData | null>(null);
   const [step, setStep] = useState(initialStep ?? 0);
-  const [tab, setTab] = useState<Tab>("Output");
+  const [tab, setTab] = useState<Tab>("Values");
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
   const [ledger, setLedger] = useState<LedgerState | null>(null);
@@ -104,9 +106,11 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
     session.current = [run, ...session.current.filter((x) => x.manifest.runId !== run.manifest.runId)];
   };
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const say = (m: string) => {
     setToast(m);
-    setTimeout(() => setToast(""), 3200);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), 3200);
   };
 
   /* ---- ledger of real changes this account has made ---- */
@@ -168,7 +172,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
       setLoading(false);
       void loadLedger(true);
     },
-    [initialRun, loadLedger],
+    [loadLedger],
   );
 
   /* ---- connection ---- */
@@ -318,6 +322,23 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
   const rowOk = (r: Row) => !r.path || validPaths.has(r.path);
   const setStrings = rows.filter((r) => r.path && r.value !== "").map((r) => `${r.path}=${r.value}`);
   const formValid = rows.every(rowOk);
+  const plan = useMemo(
+    () => (data && data.manifest.executor === "github" ? planReplay(data.manifest, data.snapshots, { from, overrides: setStrings, compensate, allowDuplicate: allowDup, dryRun }) : null),
+    // setStrings is derived from rows
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, from, rows, compensate, allowDup, dryRun],
+  );
+  /** put a value from the snapshot reader into the replay panel */
+  const addOverride = (path: string, value: string, stepIndex: number) => {
+    setRows((cur) => {
+      const has = cur.findIndex((r) => r.path === path);
+      if (has >= 0) return cur.map((r, i) => (i === has ? { path, value } : r));
+      const empty = cur.findIndex((r) => !r.path && !r.value);
+      return empty >= 0 ? cur.map((r, i) => (i === empty ? { path, value } : r)) : [...cur, { path, value }];
+    });
+    setFrom((f) => Math.min(f, stepIndex));
+    say(`Added ${path} to the replay overrides — edit the value in the Replay panel`);
+  };
 
   /* ---- streaming run/replay ---- */
   const stream = async (start: (id: string) => Promise<void>) => {
@@ -475,7 +496,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
   };
 
   const tabValue = (s: Snapshot): unknown =>
-    ({ Input: s.input, "Resolved input": s.resolvedInput, Output: s.output, Error: s.error, "Context after": s.contextAfter, Raw: s })[tab];
+    ({ Values: s.resolvedInput, Input: s.input, "Resolved input": s.resolvedInput, Output: s.output, Error: s.error, "Context after": s.contextAfter, Raw: s })[tab];
 
   const m = data?.manifest;
   const planOnly = Boolean(data?.snapshots.some((s) => isPlan(s.output)));
@@ -612,6 +633,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
                 <span className="label">status</span><span style={{ color: snap.status === "error" ? "var(--alert)" : undefined }}>{snap.status}</span>
                 <span className="label">sideEffect</span><span>{String(snap.sideEffect)}</span>
                 <span className="label">executor</span><span>{snap.executor === "github" ? "GitHub REST API (live)" : snap.executor}</span>
+                {snap.status === "injected" && (<><span className="label">reused</span><span>copied from {m?.parentRunId ?? "the recording"}, step {snap.stepIndex} · executor not called</span></>)}
                 <span className="label">hash</span><span style={{ wordBreak: "break-all" }}>{snap.hash}</span>
                 <span className="label">prevHash</span><span style={{ wordBreak: "break-all" }}>{snap.prevHash ?? "null"}</span>
               </div>
@@ -625,7 +647,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
                   <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>
                 ))}
               </div>
-              <div className="tabs">
+              {tab !== "Values" && (<div className="tabs">
                 <input ref={search} type="text" placeholder="/ search" aria-label="Search JSON" value={query} onChange={(e) => setQuery(e.target.value)} style={{ marginLeft: "auto", width: 140 }} />
                 <button
                   onClick={async () => {
@@ -635,10 +657,14 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
                 >
                   copy
                 </button>
-              </div>
-              <div className="json" data-testid="json">
-                <JsonView value={tabValue(snap)} query={query} />
-              </div>
+              </div>)}
+              {tab === "Values" && m && data ? (
+                <SnapshotReader snap={snap} manifest={m} snapshots={data.snapshots} onOverride={addOverride} say={say} />
+              ) : (
+                <div className="json" data-testid="json">
+                  <JsonView value={tabValue(snap)} query={query} />
+                </div>
+              )}
             </>
           ) : (
             !loading && <div className="label">{connected ? "Run a workflow to inspect its steps." : "Connect GitHub above to start."}</div>
@@ -681,6 +707,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
           <button className="btn" disabled={busy || !formValid || !canReplay} onClick={() => replay()} style={{ width: "100%", justifyContent: "center" }}>
             {busy ? "Replaying…" : "Replay"}
           </button>
+          {plan && canReplay && <ReplayPlanView plan={plan} />}
 
           {guard && (
             <div className="warn" role="alert" data-testid="guard">

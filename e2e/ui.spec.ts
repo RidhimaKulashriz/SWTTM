@@ -148,11 +148,11 @@ test("/app: shows no sample data before connecting, validates input, bad credent
   const connect = page.getByRole("button", { name: "Connect", exact: true });
   await expect(connect).toBeEnabled();
   await connect.click();
-  await expect(page.getByRole("alert")).toContainText("Paste your GitHub token");
+  await expect(page.locator("p.warn[role=alert]")).toContainText("Paste your GitHub token");
   await page.screenshot({ path: `${SHOTS}/${vp(page)}-app-static.png` });
   await page.getByLabel("GitHub token").fill("ghp_" + "x".repeat(36));
   await page.getByLabel("Repository (owner/name)").fill("someone/nothing");
   await connect.click();
-  await expect(page.getByRole("alert")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("p.warn[role=alert]")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator(".banner")).toContainText("NOT CONNECTED");
 });

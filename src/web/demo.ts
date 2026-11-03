@@ -9,4 +9,3 @@ export const demo = bundle as unknown as { source: string; runs: RunData[]; ledg
 /** the original (failed) run from a real `swy-tm demo` execution against live GitHub */
 export const heroRun = demo.runs[0];
 export const transcriptLines = (transcript as { lines: string[] }).lines;
-export const transcriptSource = (transcript as { source: string }).source;

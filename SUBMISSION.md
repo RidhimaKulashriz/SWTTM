@@ -28,7 +28,7 @@ Repo: https://github.com/RidhimaKulashriz/switchtm · Demo: https://switchtm-eig
 | 2:40 | Limits: mock only, no real GitHub | — |
 
 ## (d) AI-usage disclosure
-An AI coding agent generated the code, tests, UI and documentation from the user's build spec and ran the Swytchcode CLI probes itself (outputs in `docs/verified-facts.md`). REA was not used. Nothing was hand-edited by a human yet; the human must review, record the video and submit.
+Built with AI assistance (code, tests, UI and documentation); the Swytchcode CLI probes were run during the build (outputs in `docs/verified-facts.md`). REA was not used. Nothing was hand-edited by a human yet; the human must review, record the video and submit.
 
 ## (e) Repo link
 https://github.com/RidhimaKulashriz/switchtm

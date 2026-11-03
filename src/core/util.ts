@@ -64,19 +64,6 @@ export function parseValue(raw: string): unknown {
   }
 }
 
-/** every dot-path (objects only, plus array indices) available in a JSON value */
-export function listPaths(v: unknown, prefix = ""): string[] {
-  const out: string[] = [];
-  if (v && typeof v === "object") {
-    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-      const p = prefix ? `${prefix}.${k}` : k;
-      out.push(p);
-      out.push(...listPaths(val, p));
-    }
-  }
-  return out;
-}
-
 /* ---------- interpolation ---------- */
 
 const ONLY = /^\{\{\s*([^{}]+?)\s*\}\}$/;

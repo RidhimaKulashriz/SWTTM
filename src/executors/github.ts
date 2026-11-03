@@ -30,38 +30,6 @@ type GitHubIssue = {
 export const GITHUB_API = "https://api.github.com";
 export const GITHUB_TIMEOUT_MS = 15_000;
 
-export function githubEnvironment() {
-  return {
-    token: process.env.GITHUB_TOKEN,
-    owner: process.env.GITHUB_OWNER,
-    repo: process.env.GITHUB_REPO,
-    allowedEmail: process.env.GITHUB_ALLOWED_EMAIL,
-  };
-}
-
-export function githubCredentialsConfigured() {
-  const { token, owner, repo } = githubEnvironment();
-  return Boolean(token && owner && repo);
-}
-
-export function githubIntegrationConfigured() {
-  const { token, owner, repo } = githubEnvironment();
-  return Boolean(token || owner || repo);
-}
-
-export function githubAuthConfigured() {
-  return Boolean(
-    process.env.NEON_AUTH_BASE_URL &&
-    process.env.NEON_AUTH_COOKIE_SECRET &&
-    process.env.NEON_AUTH_COOKIE_SECRET.length >= 32 &&
-    process.env.GITHUB_ALLOWED_EMAIL,
-  );
-}
-
-export function githubReady() {
-  return githubCredentialsConfigured() && githubAuthConfigured() && Boolean(process.env.DATABASE_URL);
-}
-
 export function issueOutput(issue: GitHubIssue) {
   return {
     id: issue.id,
@@ -104,10 +72,9 @@ export class GitHubExecutor implements Executor {
   private readonly fetcher: typeof fetch;
 
   constructor(config: GitHubConfig = {}) {
-    const env = githubEnvironment();
-    this.token = config.token ?? env.token ?? "";
-    this.owner = config.owner ?? env.owner ?? "";
-    this.repo = config.repo ?? env.repo ?? "";
+    this.token = config.token ?? "";
+    this.owner = config.owner ?? "";
+    this.repo = config.repo ?? "";
     this.fetcher = config.fetcher ?? fetch;
   }
 

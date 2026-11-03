@@ -1000,9 +1000,6 @@ button {
   border-radius: 99px;
   border: 1px solid currentColor;
 }
-.badge.mock {
-  color: var(--amber);
-}
 .badge.real {
   color: var(--ok);
 }
@@ -1367,4 +1364,65 @@ button {
   position: static;
   background: transparent;
   flex: none;
+}
+
+/* ---------- snapshot reader + replay plan ---------- */
+.reader .note {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  font-size: 13px;
+}
+.vtable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.vtable td {
+  padding: 5px 8px 5px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.vtable td.val {
+  word-break: break-word;
+  color: var(--ok);
+}
+.vtable .chipf {
+  margin-left: 8px;
+}
+.plan {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.plan ol,
+.plan ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.plan li {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--line);
+  font-size: 12px;
+}
+.plan li.plan-reuse {
+  border-left-color: var(--ok);
+}
+.plan li.plan-run,
+.plan li.plan-undo {
+  border-left-color: var(--amber);
+}
+.plan li .rec {
+  color: var(--dim);
+  word-break: break-word;
+}
+.plan .changes li {
+  border-left-color: var(--alert);
 }

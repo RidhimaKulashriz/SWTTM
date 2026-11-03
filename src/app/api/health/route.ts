@@ -13,10 +13,5 @@ export async function GET() {
     database = false;
   }
   const status = health();
-  return Response.json({
-    ...status,
-    database,
-    services: { ...status.services, postgres: database },
-    github: { ...status.github, ready: status.github.ready && database },
-  });
+  return Response.json({ ...status, database, services: { ...status.services, postgres: database } });
 }

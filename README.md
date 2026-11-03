@@ -21,6 +21,12 @@ Recommended token: a fine-grained personal access token limited to one repositor
 
 Before connecting, `/app` shows a clearly labelled, read-only *example recording* so you can see what a run looks like.
 
+### Reading snapshots and replay values
+
+* **Values tab** (default in the inspector) reads a snapshot value by value: every value the step received, **where it came from** (`inputs.label`, `steps.create.output.number` recorded, or fixed in the workflow), the value it produced (exactly what a replay injects), and every `{{ref}}` later steps can use. *change on replay* sends a value straight into the replay overrides; *copy ref* copies the template reference.
+* Injected snapshots say so: *Reused, not executed — copied from run X, step N*.
+* **Replay plan** (replay panel) shows, before you press Replay, what each step will do: reuse the recorded value, call GitHub, undo then call GitHub, or plan only. It lists the values that change (`inputs.finalState: "pending" → "closed"`), the predicted number of GitHub calls and reused steps, and warns when the side-effect guard would stop the replay. Its predictions are asserted against the real engine in `tests/plan.test.ts`.
+
 ### API
 | Route | Purpose |
 |---|---|
@@ -31,9 +37,7 @@ Before connecting, `/app` shows a clearly labelled, read-only *example recording
 | `POST /api/runs/:id/reconcile` | Live check against GitHub |
 | `POST /api/runs/:id/verify`, `GET /api/diff`, `GET /api/ledger` | Integrity, divergence, side-effect ledger |
 
-Optional server-owned mode (a single trusted owner, behind Neon Auth) still works when `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_ALLOWED_EMAIL`, `NEON_AUTH_BASE_URL` and `NEON_AUTH_COOKIE_SECRET` are set; it is not required for visitors.
-
-Local setup: set `DATABASE_URL` (and `DATABASE_URL_UNPOOLED` for migrations if pooled), run `npm run db:push`, then `npm run dev`. The offline simulator used by the CLI demo and the test-suite never appears in the web debugger.
+Local setup: set `DATABASE_URL` (and `DATABASE_URL_UNPOOLED` for migrations if pooled), run `npm run db:push`, then `npm run dev`. No server-side GitHub credentials exist: every visitor connects their own token. The offline simulator used by the CLI demo and the test-suite never appears in the web debugger.
 
 ## Problem and intended user
 When step 3 of a 3-step agent workflow fails, steps 1–2 already created real side effects. Re-running everything risks duplicates; audit logs say *that* it failed, not what state step 2 left behind, and you cannot change one input and re-run only the tail. Intended user: someone building agent workflows on Swytchcode methods.
@@ -45,16 +49,17 @@ Swytchcode CLI 2.25.1 (`init`, `get`, `add method`, `info`, `list`, `search`, `e
 Requires Node ≥ 22. Available checks include `npm run lint`, `npm run typecheck`, `npm run build`, `npx vitest run`, and `npx playwright test`.
 ```bash
 npm install
-./bin/swy-tm demo                       # or: npx tsx src/cli/index.ts demo   (MOCK executor, offline)
+./bin/swy-tm demo                       # or: npx tsx src/cli/index.ts demo   (offline simulator, CLI and tests only)
 npx vitest run                          # engine, API and real-GitHub flow tests (fake GitHub server)
 npm run build                           # Next.js production build
 ./scripts/restart-server.sh             # serves UI + API on http://127.0.0.1:4173 (UI at /app)
+FAKE_GITHUB=1 ./scripts/restart-server.sh   # same, but a token starting with "fake" talks to an in-memory GitHub (e2e/fake-github.cjs, tests only)
 npx playwright test                     # e2e at 1440×900 and 390×844 (server must be running)
 ./scripts/verify.sh                     # everything above in order
 ```
 CLI:
 ```bash
-./bin/swy-tm run workflows/demo-tracker.workflow.json      # fails at step 2 (MOCK 422 invalid_state)
+./bin/swy-tm run workflows/demo-tracker.workflow.json      # fails at step 2 (simulated 422 invalid_state)
 ./bin/swy-tm list
 ./bin/swy-tm inspect <run> --step 1
 ./bin/swy-tm replay <run> --from-step 2 --set inputs.finalState=closed
@@ -69,7 +74,7 @@ Real executor (needs the `swytchcode` binary, run from the repo root where `.swy
 
 ## What worked
 - Hash-chained per-step snapshots with redaction (`authorization/token/api_key/password/secret` → `[REDACTED]`), `verify` detects tampering.
-- Replay from step 2 makes **1 executor call and injects 2 steps** (asserted in tests); the mock ledger shows `created: 1`, not 2.
+- Replay from step 2 makes **1 executor call and injects 2 steps** (asserted in tests); the simulator ledger shows `created: 1`, not 2.
 - Side-effect guard (exit 3, nothing executed), `--compensate` (reverse order, then replay → ledger `created 2, deleted 1`).
 - Divergence report with volatile-field counting; the same engine is served to the UI.
 - The real Swytchcode executor runs `swytchcode exec --json` with `{"tool","args"}` on stdin and records the CLI's classified stderr error as a snapshot (verified with the GitHub dry-run).
@@ -94,7 +99,7 @@ TODO_ADD_VIDEO_URL
 flowchart LR
   WF[workflow.json] --> RUN[engine.runWorkflow]
   RUN -->|exec| EX{Executor}
-  EX -->|mock| MOCK[(MOCK tracker + ledger)]
+  EX -->|simulator, CLI+tests only| MOCK[(offline tracker + ledger)]
   EX -->|github| GH[GitHub REST API · allowlisted repo]
   EX -->|swytchcode| SWY[swytchcode exec --json]
   RUN --> SNAP[(timemachine/&lt;run&gt;/step-NN.json + manifest, sha256 chain)]
@@ -111,7 +116,7 @@ flowchart LR
 - Does **not** read Swytchcode's internal state: Time Machine keeps its own snapshots, and the output of each step is the state carrier.
 - Compensation is best-effort and user-defined; no rollback guarantee.
 - Redaction is key-name based; secrets under other key names would be stored. Redacted values flow into injected context.
-- SSE bus is in-memory (single process); run history is durable in Neon. `serve` uses the Next.js server bound to 127.0.0.1.
+- SSE bus is in-memory (single process); run history is durable in PostgreSQL. `serve` uses the Next.js server bound to 127.0.0.1.
 - Real GitHub execution works for any visitor who connects their own token. Automated tests drive the real code paths against an in-process fake of the GitHub REST API (no live issue is created by tests).
 - Replay of `--executor swytchcode` re-resolves nothing from Swytchcode: injected outputs are the recorded ones.
 
