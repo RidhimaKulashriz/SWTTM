@@ -120,7 +120,3 @@ flowchart LR
 - Real GitHub execution works for any visitor who connects their own token. Automated tests drive the real code paths against an in-process fake of the GitHub REST API (no live issue is created by tests).
 - Replay of `--executor swytchcode` re-resolves nothing from Swytchcode: injected outputs are the recorded ones.
 
-## AI disclosure
-Written end to end by an AI coding agent (this repository and its docs), including the Swytchcode CLI probing, code, tests and UI, from a build spec supplied by the user. Command outputs quoted in docs were produced by actually running the commands. REA was **not** used. The human still needs to review everything, record the demo video and submit the form.
-
-Interaction design inspired by modern award-style agency sites.
