@@ -156,3 +156,43 @@ test("/app: shows no sample data before connecting, validates input, bad credent
   await expect(page.locator("p.warn[role=alert]")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator(".banner")).toContainText("NOT CONNECTED");
 });
+
+test("anchor links land on the right section, including pinned ones, from anywhere on the page", async ({ page }) => {
+  await quiet(page);
+  await page.goto("/");
+  await page.waitForFunction(() => (window as unknown as { __swytmReady?: boolean }).__swytmReady === true);
+  await page.waitForTimeout(600);
+  // footer links reach every section; jump in a scrambled order so each one starts from a different pinned/unpinned state
+  for (const id of ["use-cases", "statement", "why", "problems", "solution", "intro", "use-cases", "why"]) {
+    await page.evaluate((h) => (document.querySelector(`.footer a[href="#${h}"], .nav a[href="#${h}"], .hero a[href="#${h}"], #statement a[href="#${h}"]`) as HTMLElement | null)?.click() ?? (document.documentElement.dataset.noLink = h), id);
+    if (await page.evaluate(() => !!document.documentElement.dataset.noLink)) {
+      await page.evaluate(() => delete document.documentElement.dataset.noLink);
+      continue; // no link to this id on the page
+    }
+    await expect
+      .poll(async () => page.evaluate((h) => Math.abs(document.getElementById(h)!.getBoundingClientRect().top), id), { timeout: 8000 })
+      .toBeLessThan(vp(page) === "desktop" ? 100 : 120);
+  }
+});
+
+test("reload keeps the reading position (pins are measured before restoring)", async ({ page }) => {
+  await quiet(page);
+  await page.goto("/");
+  await page.waitForFunction(() => (window as unknown as { __swytmReady?: boolean }).__swytmReady === true);
+  await page.waitForTimeout(600);
+  const target = await page.evaluate(() => Math.round(document.getElementById("solution")!.getBoundingClientRect().top + window.scrollY));
+  await page.evaluate((y) => window.scrollTo(0, y), target);
+  await page.waitForTimeout(800);
+  await page.reload();
+  await page.waitForFunction(() => (window as unknown as { __swytmReady?: boolean }).__swytmReady === true);
+  await page.waitForTimeout(1500);
+  const after = await page.evaluate(() => Math.round(window.scrollY));
+  expect(Math.abs(after - target)).toBeLessThan(40);
+});
+
+test("the GitHub links point at the real repository", async ({ page }) => {
+  await quiet(page);
+  await page.goto("/");
+  const hrefs = await page.locator('a[target="_blank"]').evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).href));
+  expect(hrefs.filter((h) => h === "https://github.com/" || h === "https://github.com")).toEqual([]);
+});

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Lenis from "lenis";
-import { MQ, ScrollTrigger, gsap, markReady, smooth } from "./gsap";
+import { MQ, ScrollTrigger, gsap, markReady, scrollToEl, smooth } from "./gsap";
 
 /* ---------------- smooth scroll (Lenis → ScrollTrigger) ---------------- */
 export function SmoothScroll() {
@@ -19,7 +19,7 @@ export function SmoothScroll() {
       const el = document.querySelector(a.getAttribute("href")!);
       if (el) {
         e.preventDefault();
-        lenis.scrollTo(el as HTMLElement, { offset: -80 });
+        scrollToEl(el);
       }
     };
     document.addEventListener("click", click);

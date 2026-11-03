@@ -5,7 +5,7 @@ import { ClockGlyph } from "./components";
 import { heroRun } from "./demo";
 import { MQ, ScrollTrigger, gsap, onReady, scrollToEl } from "./gsap";
 
-export const REPO = process.env.NEXT_PUBLIC_REPO_URL || "https://github.com";
+export const REPO = process.env.NEXT_PUBLIC_REPO_URL || "https://github.com/RidhimaKulashriz/SWTTM";
 
 /* ------------------------------ A. Nav ------------------------------ */
 export function Nav() {
