@@ -87,7 +87,7 @@ Usage:
   swytchcode init [flags]
 
 Flags:
-      --editor string     cursor | claude | codex | copilot | gemini | hermes | openclaw | windsurf | none, or with --operator: hermes | openclaw | zeroclaw | none
+      --editor string     cursor | codex | copilot | gemini | hermes | openclaw | windsurf | none, or with --operator: hermes | openclaw | zeroclaw | none
   -h, --help              help for init
       --mode string       production | sandbox
       --non-interactive   disable prompts; suitable for CI

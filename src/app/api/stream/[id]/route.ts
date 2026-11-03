@@ -1,14 +1,13 @@
 import { channel } from "@/server/service";
-import { authorizeGitHubUser } from "@/server/github-access";
 
 export const dynamic = "force-dynamic";
 
 /** Server-Sent Events: emits `step` events live while a run/replay started with the same streamId executes. */
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const denied = await authorizeGitHubUser();
-  if (denied) return denied;
   const { id } = await ctx.params;
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return Response.json({ error: "Invalid stream id" }, { status: 400 });
+  // Browsers cannot attach custom headers to EventSource, so the unguessable stream id (>= 16 random characters,
+  // chosen by the caller and never listed anywhere) is the capability that grants access to this run's live events.
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(id)) return Response.json({ error: "Invalid stream id" }, { status: 400 });
   const chan = channel(id);
   const enc = new TextEncoder();
   let unsub: (() => void) | undefined;

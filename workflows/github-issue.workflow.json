@@ -1,17 +1,36 @@
 {
   "id": "github-issue",
-  "name": "GitHub: create issue, add label, update state (live GitHub API executor)",
+  "name": "GitHub issue lifecycle: create issue, add label, set state (live GitHub API)",
   "executor": "github",
-  "inputs": { "owner": "OWNER", "repo": "REPO", "title": "swy-tm test issue", "label": "bug", "finalState": "closed" },
+  "inputs": {
+    "owner": "OWNER",
+    "repo": "REPO",
+    "title": "swy-tm test issue",
+    "label": "bug",
+    "finalState": "closed"
+  },
   "steps": [
     {
       "id": "create",
       "canonical_id": "github.issue.create",
-      "input": { "owner": "{{inputs.owner}}", "repo": "{{inputs.repo}}", "body": { "title": "{{inputs.title}}" } },
+      "input": {
+        "owner": "{{inputs.owner}}",
+        "repo": "{{inputs.repo}}",
+        "body": {
+          "title": "{{inputs.title}}"
+        }
+      },
       "sideEffect": true,
       "compensate": {
         "canonical_id": "github.issue.update",
-        "input": { "owner": "{{inputs.owner}}", "repo": "{{inputs.repo}}", "issue_number": "{{steps.create.output.number}}", "body": { "state": "closed" } }
+        "input": {
+          "owner": "{{inputs.owner}}",
+          "repo": "{{inputs.repo}}",
+          "issue_number": "{{steps.create.output.number}}",
+          "body": {
+            "state": "closed"
+          }
+        }
       }
     },
     {
@@ -21,9 +40,22 @@
         "owner": "{{inputs.owner}}",
         "repo": "{{inputs.repo}}",
         "issue_number": "{{steps.create.output.number}}",
-        "body": { "labels": ["{{inputs.label}}"] }
+        "body": {
+          "labels": [
+            "{{inputs.label}}"
+          ]
+        }
       },
-      "sideEffect": true
+      "sideEffect": true,
+      "compensate": {
+        "canonical_id": "github.issue.labels.remove",
+        "input": {
+          "owner": "{{inputs.owner}}",
+          "repo": "{{inputs.repo}}",
+          "issue_number": "{{steps.create.output.number}}",
+          "name": "{{inputs.label}}"
+        }
+      }
     },
     {
       "id": "close",
@@ -32,9 +64,22 @@
         "owner": "{{inputs.owner}}",
         "repo": "{{inputs.repo}}",
         "issue_number": "{{steps.create.output.number}}",
-        "body": { "state": "{{inputs.finalState}}" }
+        "body": {
+          "state": "{{inputs.finalState}}"
+        }
       },
-      "sideEffect": true
+      "sideEffect": true,
+      "compensate": {
+        "canonical_id": "github.issue.update",
+        "input": {
+          "owner": "{{inputs.owner}}",
+          "repo": "{{inputs.repo}}",
+          "issue_number": "{{steps.create.output.number}}",
+          "body": {
+            "state": "open"
+          }
+        }
+      }
     }
   ]
 }

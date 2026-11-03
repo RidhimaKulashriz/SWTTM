@@ -1,20 +1,29 @@
 import { z } from "zod";
 import { diffRuns } from "../core/diff";
-import { replayRun, runWorkflow, verifyRun, verifySnapshots } from "../core/engine";
+import { replayRun, runWorkflow, verifySnapshots } from "../core/engine";
 import { MemoryStore } from "../core/memory-store";
 import { Store, assertRunId } from "../core/store";
-import { TmError, WorkflowSchema, type Manifest, type Snapshot } from "../core/types";
+import { TmError, WorkflowSchema, type Executor, type Manifest, type Snapshot } from "../core/types";
 import { listWorkflows, loadNamedWorkflow } from "../core/workflows";
 import { createExecutor, mockLedger } from "../executors/executor";
 import { emptyMockState, rebuildMockState, type MockState } from "../executors/mock";
 import { detectBinary } from "../executors/swytchcode";
-import { githubCredentialsConfigured, githubReady } from "../executors/github";
+import { GitHubExecutor, githubCredentialsConfigured, githubReady } from "../executors/github";
 import { getStoredRun, listStoredRuns, listStoredRunsWithSnapshots, saveRun } from "../db/runs";
+import { CONNECT_REQUIRED, type Access } from "./access";
 
 const mem = globalThis as unknown as { __swytmMem?: MemoryStore };
 /** Serverless hosts have a read-only disk, so they use one process-wide in-memory store (warm instances share it). */
 export const store = (): Store => (process.env.VERCEL ? (mem.__swytmMem ??= new MemoryStore()) : new Store());
-const databaseEnabled = process.env.NODE_ENV !== "test" && Boolean(process.env.DATABASE_URL);
+const databaseEnabled = () => process.env.NODE_ENV !== "test" && Boolean(process.env.DATABASE_URL);
+
+const ANON: Access = { kind: "anonymous", ownerKey: "anonymous" };
+
+/**
+ * Connected visitors never touch the shared store: their runs live in a private per-request store and are
+ * persisted under their own account key (or returned to their browser when there is no database).
+ */
+const privateAccess = (a: Access) => a.kind !== "anonymous";
 
 /* ---- tiny in-memory event bus for SSE (single Node process) ---- */
 type Ev = { type: string; data: unknown };
@@ -27,7 +36,7 @@ export function channel(id: string): Chan {
   if (!c) {
     c = { events: [], subs: new Set(), done: false };
     bus.set(id, c);
-    setTimeout(() => bus.delete(id), 60_000).unref?.();
+    setTimeout(() => bus.delete(id), 120_000).unref?.();
   }
   return c;
 }
@@ -49,7 +58,7 @@ export const RunBody = z.object({
   dryRun: z.boolean().default(false),
   streamId: StreamId,
 });
-/** A mock run sent back by the client so it can be replayed/verified on stateless hosts and without sign-in. */
+/** A run sent back by the client so it can be replayed/verified on stateless hosts. Hash-chain verified before use. */
 export const SeedSchema = z.object({
   manifest: z.custom<Manifest>((v) => Boolean(v) && typeof v === "object"),
   snapshots: z.array(z.custom<Snapshot>((v) => Boolean(v) && typeof v === "object")).min(1).max(200),
@@ -71,52 +80,50 @@ export function health() {
   const configured = githubCredentialsConfigured();
   return {
     ok: true,
-    version: "0.1.0",
-    executors: { mock: true, swytchcode: detectBinary() ?? false, github: githubReady() },
+    version: "0.2.0",
+    executors: { mock: true, swytchcode: detectBinary() ?? false, github: true },
     services: {
       postgres: Boolean(process.env.DATABASE_URL),
     },
     github: {
+      /** visitors connect their own token; this only reports the optional server-owned connection */
       ready: githubReady(),
+      connectYourOwn: true,
       repository: configured ? `${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}` : null,
     },
   };
 }
 
-export async function listRuns() {
-  const runs = databaseEnabled ? await listStoredRuns() : store().listRuns();
+/* ---- reading history ---- */
+export async function listRuns(access: Access = ANON) {
+  let runs: Manifest[];
+  if (privateAccess(access)) runs = databaseEnabled() ? await listStoredRuns(access.ownerKey) : [];
+  else runs = store().listRuns();
   return runs.map(({ workflow: _w, ...m }) => m);
 }
 
-export async function getRun(id: string) {
+export async function getRun(id: string, access: Access = ANON) {
+  assertRunId(id);
+  if (privateAccess(access)) {
+    const stored = databaseEnabled() ? await getStoredRun(id, access.ownerKey) : null;
+    if (!stored) throw new TmError(`Run "${id}" not found in your history`, 5);
+    return stored;
+  }
   const s = store();
-  const stored = databaseEnabled ? await getStoredRun(id) : null;
-  if (stored) return stored;
   return { manifest: s.readManifest(id), snapshots: s.readSnapshots(id) };
 }
 
-export async function getStep(id: string, n: string): Promise<Snapshot> {
-  const stored = databaseEnabled ? await getStoredRun(id) : null;
-  if (stored) {
-    const hit = stored.snapshots.find((x) => String(x.stepIndex) === n || x.stepId === n);
-    if (!hit) throw new TmError(`Step "${n}" not found in run ${id}`, 5);
-    return hit;
-  }
-  const hit = store()
-    .readSteps(id)
-    .find((x) => String(x.stepIndex) === n || x.stepId === n);
+export async function getStep(id: string, n: string, access: Access = ANON): Promise<Snapshot> {
+  const { snapshots } = await getRun(id, access);
+  const hit = snapshots.find((x) => String(x.stepIndex) === n || x.stepId === n);
   if (!hit) throw new TmError(`Step "${n}" not found in run ${id}`, 5);
   return hit;
 }
 
-export async function getDiff(a: string, b: string, ignore: string[]) {
-  const s = store();
-  const [left, right] = databaseEnabled ? await Promise.all([getStoredRun(a), getStoredRun(b)]) : [null, null];
-  return diffRuns(
-    { runId: a, steps: left?.snapshots.filter((x) => !x.stepId.endsWith(":compensate")) ?? s.readSteps(a) },
-    { runId: b, steps: right?.snapshots.filter((x) => !x.stepId.endsWith(":compensate")) ?? s.readSteps(b) },
-    { ignore },
-  );
+export async function getDiff(a: string, b: string, ignore: string[], access: Access = ANON) {
+  const [left, right] = await Promise.all([getRun(a, access), getRun(b, access)]);
+  const strip = (x: Snapshot[]) => x.filter((s) => !s.stepId.endsWith(":compensate"));
+  return diffRuns({ runId: a, steps: strip(left.snapshots) }, { runId: b, steps: strip(right.snapshots) }, { ignore });
 }
 
 function isDryRunOutput(output: unknown): boolean {
@@ -124,37 +131,38 @@ function isDryRunOutput(output: unknown): boolean {
 }
 
 function countLedger(runs: { manifest: Manifest; snapshots: Snapshot[] }[]) {
-  const ledger = { created: 0, deleted: 0, labeled: 0, unlabeled: 0, updated: 0 };
+  const ledger = { created: 0, deleted: 0, labeled: 0, unlabeled: 0, updated: 0, commented: 0 };
   for (const run of runs) {
     for (const snapshot of run.snapshots) {
       if (snapshot.status !== "ok" || isDryRunOutput(snapshot.output)) continue;
-      if (snapshot.canonicalId === "tracker.issue.create" || snapshot.canonicalId === "github.issue.create") ledger.created++;
-      if (snapshot.canonicalId === "tracker.issue.delete") ledger.deleted++;
-      if (snapshot.canonicalId === "tracker.issue.label" || snapshot.canonicalId === "github.issue.labels.create") ledger.labeled++;
-      if (snapshot.canonicalId === "tracker.issue.unlabel") ledger.unlabeled++;
-      if (snapshot.canonicalId === "tracker.issue.update" || snapshot.canonicalId === "github.issue.update") ledger.updated++;
+      const id = snapshot.canonicalId;
+      if (id === "tracker.issue.create" || id === "github.issue.create") ledger.created++;
+      if (id === "tracker.issue.delete" || id === "github.issue.comment.delete") ledger.deleted++;
+      if (id === "tracker.issue.label" || id === "github.issue.labels.create") ledger.labeled++;
+      if (id === "tracker.issue.unlabel" || id === "github.issue.labels.remove") ledger.unlabeled++;
+      if (id === "tracker.issue.update" || id === "github.issue.update") ledger.updated++;
+      if (id === "github.issue.comment.create") ledger.commented++;
     }
   }
-  return { mock: runs.every((run) => run.manifest.mock), ledger };
+  return { mock: runs.length > 0 && runs.every((run) => run.manifest.mock), ledger };
 }
 
-export async function getLedger() {
-  if (!databaseEnabled) {
-    const s = store();
-    // serverless: the fake tracker has no file, so count the side effects recorded in the in-memory runs
-    if (s instanceof MemoryStore) return countLedger(s.listRuns().map((manifest) => ({ manifest, snapshots: s.readSnapshots(manifest.runId) })));
-    return { mock: true, ledger: mockLedger(s) };
-  }
-  return countLedger(await listStoredRunsWithSnapshots());
+export async function getLedger(access: Access = ANON) {
+  if (privateAccess(access)) return countLedger(databaseEnabled() ? await listStoredRunsWithSnapshots(access.ownerKey) : []);
+  const s = store();
+  if (s instanceof MemoryStore) return countLedger(s.listRuns().map((manifest) => ({ manifest, snapshots: s.readSnapshots(manifest.runId) })));
+  const mock = mockLedger(s);
+  return { mock: true, ledger: { ...mock, commented: 0 } };
 }
 
-/** Validate a client-supplied mock run (shape, mock-only, hash chain) and load it into a private in-memory store. */
-export function loadSeed(seed: Seed): { store: MemoryStore; manifest: Manifest; snapshots: Snapshot[] } {
+/** Validate a client-supplied run (shape, hash chain, executor allowed for this caller) and load it into a private in-memory store. */
+export function loadSeed(seed: Seed, access: Access = ANON): { store: MemoryStore; manifest: Manifest; snapshots: Snapshot[] } {
   const manifest = seed.manifest;
   const runId = assertRunId(String(manifest.runId));
-  if (manifest.executor !== "mock" || manifest.mock !== true) {
-    throw new TmError("Only mock-executor runs can be replayed or verified without signing in.", 2);
-  }
+  const live = manifest.executor === "github" && !manifest.mock;
+  const offline = manifest.executor === "mock" && manifest.mock === true;
+  if (!live && !offline) throw new TmError("Only GitHub and offline-simulator runs can be replayed from supplied data.", 2);
+  if (live && access.kind === "anonymous") throw new TmError(CONNECT_REQUIRED, 2);
   WorkflowSchema.parse(manifest.workflow);
   const ordered = [...seed.snapshots].sort((a, b) => a.seq - b.seq);
   if (ordered.some((x) => x.runId !== runId)) throw new TmError("Snapshots do not belong to the supplied run.", 4);
@@ -166,11 +174,10 @@ export function loadSeed(seed: Seed): { store: MemoryStore; manifest: Manifest; 
   return { store: ms, manifest, snapshots: ordered };
 }
 
-export async function getVerify(id: string, seed?: Seed) {
-  if (seed) return verifySnapshots(loadSeed(seed).snapshots);
-  const stored = databaseEnabled ? await getStoredRun(id) : null;
-  if (stored) return verifySnapshots([...stored.snapshots].sort((a, b) => a.seq - b.seq));
-  return verifyRun(store(), id);
+export async function getVerify(id: string, seed?: Seed, access: Access = ANON) {
+  if (seed) return verifySnapshots(loadSeed(seed, access).snapshots);
+  const { snapshots } = await getRun(id, access);
+  return verifySnapshots([...snapshots].sort((a, b) => a.seq - b.seq));
 }
 
 export function workflows() {
@@ -182,62 +189,76 @@ export function resolveRunExecutor(body: z.infer<typeof RunBody>) {
   return body.executor ?? workflow.executor;
 }
 
-function exec(name: "mock" | "swytchcode" | "github", currentStore: Store, mockState?: MockState) {
-  if (name === "swytchcode" && !detectBinary()) throw new TmError("swytchcode CLI not found on PATH; use executor=mock", 2);
-  if (name === "github" && !githubReady()) throw new TmError("Live GitHub execution requires GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, Neon Auth, an allowed email, and PostgreSQL configuration.", 7);
+function exec(name: "mock" | "swytchcode" | "github", currentStore: Store, access: Access, mockState?: MockState): Executor {
+  if (name === "swytchcode" && !detectBinary()) throw new TmError("swytchcode CLI not found on PATH; use executor=github", 2);
+  if (name === "github") {
+    if (access.kind === "connection") {
+      const c = access.connection;
+      return new GitHubExecutor({ token: c.token, owner: c.owner, repo: c.repo });
+    }
+    if (access.kind === "owner" && githubReady()) return new GitHubExecutor();
+    throw new TmError(CONNECT_REQUIRED, 2);
+  }
   return createExecutor(name, currentStore, undefined, mockState);
 }
 
-export async function startRun(body: z.infer<typeof RunBody>, opts: { persist?: boolean } = {}) {
-  const persist = opts.persist ?? true;
-  const currentStore = store();
+async function persist(access: Access, manifest: Manifest, snapshots: Snapshot[]) {
+  if (privateAccess(access) && databaseEnabled()) await saveRun(manifest, snapshots, access.ownerKey);
+}
+
+export async function startRun(body: z.infer<typeof RunBody>, opts: { access?: Access } = {}) {
+  const access = opts.access ?? ANON;
+  const currentStore: Store = privateAccess(access) ? new MemoryStore() : store();
   const wf = loadNamedWorkflow(body.workflow);
   const workflow = WorkflowSchema.parse(wf);
   const executorName = body.executor ?? workflow.executor;
-  const r = await runWorkflow(wf, {
-    store: currentStore,
-    // in-memory MemoryStore (serverless) => in-memory fake tracker; file store => file-backed tracker
-    executor: exec(executorName, currentStore, executorName === "mock" && currentStore instanceof MemoryStore ? emptyMockState() : undefined),
-    overrides: body.set,
-    dryRun: body.dryRun,
-    hooks: { onStep: (snap) => publish(body.streamId, { type: "step", data: snap }) },
-  });
-  publish(body.streamId, { type: "done", data: { runId: r.manifest.runId, outcome: r.manifest.outcome } });
-  if (databaseEnabled && persist) await saveRun(r.manifest, r.snapshots);
-  return { runId: r.manifest.runId, outcome: r.manifest.outcome, executorCalls: r.executorCalls, manifest: r.manifest, snapshots: r.snapshots };
+  const executor = exec(executorName, currentStore, access, executorName === "mock" && currentStore instanceof MemoryStore ? emptyMockState() : undefined);
+  try {
+    const r = await runWorkflow(wf, {
+      store: currentStore,
+      executor,
+      overrides: body.set,
+      dryRun: body.dryRun,
+      hooks: { onStep: (snap) => publish(body.streamId, { type: "step", data: snap }) },
+    });
+    publish(body.streamId, { type: "done", data: { runId: r.manifest.runId, outcome: r.manifest.outcome } });
+    await persist(access, r.manifest, r.snapshots);
+    return { runId: r.manifest.runId, outcome: r.manifest.outcome, executorCalls: r.executorCalls, manifest: r.manifest, snapshots: r.snapshots };
+  } catch (e) {
+    publish(body.streamId, { type: "done", data: { error: (e as Error).message } });
+    throw e;
+  }
 }
 
-export async function startReplay(id: string, body: z.infer<typeof ReplayBody>, opts: { persist?: boolean } = {}) {
-  let s: Store;
-  let fromDb = false;
-  const persist = opts.persist ?? true;
-  if (body.seed) {
-    // stateless path: the client supplied the (verified, mock-only) run
-    const seeded = loadSeed(body.seed);
+/** Load a run (from this account's saved history or from verified client-supplied data) into a store replay can use. */
+export async function loadReplaySource(id: string, seed: Seed | undefined, access: Access): Promise<Store> {
+  if (seed) {
+    const seeded = loadSeed(seed, access);
     if (seeded.manifest.runId !== id) throw new TmError("Supplied run id does not match the URL.", 2);
-    s = seeded.store;
-  } else {
-    s = store();
-    const stored = databaseEnabled ? await getStoredRun(id) : null;
-    if (stored) {
-      fromDb = true;
-      s.writeManifest(stored.manifest);
-      const have = new Set<number>();
-      try {
-        for (const x of s.readSnapshots(id)) have.add(x.seq);
-      } catch {
-        /* run not in the local store yet */
-      }
-      for (const snapshot of [...stored.snapshots].sort((a, b) => a.seq - b.seq)) if (!have.has(snapshot.seq)) s.writeSnapshot(snapshot);
-    }
+    return seeded.store;
   }
+  if (privateAccess(access)) {
+    const stored = databaseEnabled() ? await getStoredRun(id, access.ownerKey) : null;
+    if (!stored) throw new TmError(`Run "${id}" not found in your history`, 5);
+    const ms = new MemoryStore();
+    ms.writeManifest(stored.manifest);
+    for (const snapshot of [...stored.snapshots].sort((a, b) => a.seq - b.seq)) ms.writeSnapshot(snapshot);
+    return ms;
+  }
+  const s = store();
+  s.readManifest(id);
+  return s;
+}
+
+export async function startReplay(id: string, body: z.infer<typeof ReplayBody>, opts: { access?: Access } = {}) {
+  const access = opts.access ?? ANON;
+  const s = await loadReplaySource(id, body.seed, access);
   const orig = s.readManifest(id);
-  const mockState =
-    orig.executor === "mock" && (body.seed || fromDb || s instanceof MemoryStore) ? await rebuildMockState(s.readSnapshots(id)) : undefined;
+  const mockState = orig.executor === "mock" && (body.seed || s instanceof MemoryStore) ? await rebuildMockState(s.readSnapshots(id)) : undefined;
   try {
     const r = await replayRun({
       store: s,
-      executor: exec(orig.executor, s, mockState),
+      executor: exec(orig.executor, s, access, mockState),
       runId: id,
       fromStep: body.fromStep,
       overrides: body.set,
@@ -247,7 +268,7 @@ export async function startReplay(id: string, body: z.infer<typeof ReplayBody>, 
       hooks: { onStep: (snap) => publish(body.streamId, { type: "step", data: snap }) },
     });
     publish(body.streamId, { type: "done", data: { runId: r.manifest.runId, outcome: r.manifest.outcome } });
-    if (databaseEnabled && persist) await saveRun(r.manifest, r.snapshots);
+    await persist(access, r.manifest, r.snapshots);
     return {
       runId: r.manifest.runId,
       outcome: r.manifest.outcome,
@@ -270,7 +291,7 @@ export function errorResponse(e: unknown): Response {
     return Response.json({ error: "Invalid request", issues: e.issues.map((i) => ({ path: i.path.join("."), message: i.message })) }, { status: 400 });
   }
   if (e instanceof TmError) {
-    const status = /^Invalid run id/.test(e.message) ? 400 : e.code === 5 ? 404 : e.code === 3 ? 409 : e.code === 2 ? 400 : e.code === 4 ? 422 : e.code === 7 ? 503 : 500;
+    const status = /^Invalid run id/.test(e.message) ? 400 : e.code === 5 ? 404 : e.code === 3 ? 409 : e.code === 2 ? (e.message === CONNECT_REQUIRED ? 401 : 400) : e.code === 4 ? 422 : e.code === 7 ? 503 : 500;
     return Response.json({ error: e.message, code: e.code, details: e.details }, { status });
   }
   return Response.json({ error: (e as Error).message ?? "internal error" }, { status: 500 });

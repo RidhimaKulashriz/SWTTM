@@ -138,38 +138,19 @@ test("axe: no serious/critical violations on / and /app", async ({ page }) => {
   }
 });
 
-test("/app: run → replay with override → divergence; guard 409 → compensate; ledger", async ({ page }) => {
-  test.skip(vp(page) === "mobile", "full flow is exercised at 1440×900");
+test("/app: connect form first, example recording is read-only, bad credentials are rejected by GitHub", async ({ page }) => {
   await quiet(page);
   await page.goto("/app");
-  await expect(page.locator(".banner")).toContainText("LIVE API CONNECTED");
+  await expect(page.locator(".banner")).toContainText("EXAMPLE RECORDING");
+  await expect(page.getByRole("form", { name: "Connect GitHub" })).toBeVisible();
   await expect(page.locator("#st-0")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Replay", exact: true })).toBeDisabled();
   await page.screenshot({ path: `${SHOTS}/${vp(page)}-app-static.png` });
-  const previewRunId = await page.locator("#runsel").inputValue();
-  await page.getByRole("button", { name: "Run mock demo" }).click();
-  await expect(page.locator("#runsel")).not.toHaveValue(previewRunId, { timeout: 15_000 });
-  await expect(page.locator("#st-2")).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator(".banner")).toContainText("LIVE API CONNECTED");
-  const orig = await page.locator("#runsel").inputValue();
-  await page.locator("#st-2").click();
-  await page.getByLabel("Override path 1").fill("inputs.finalState");
-  await page.getByLabel("Override value 1").fill("closed");
-  await page.getByRole("button", { name: "Replay", exact: true }).click();
-  await expect(page.getByLabel("Divergence")).toContainText("status: error → ok", { timeout: 15_000 });
-  await page.screenshot({ path: `${SHOTS}/${vp(page)}-app-replay.png` });
-  await expect(page.getByTestId("ledger-created")).toHaveText("1");
-  await page.goto(`/app?run=${orig}&step=0`);
-  await expect(page.locator("#st-0")).toBeVisible();
-  await expect(page.locator("#runsel")).toHaveValue(orig);
-  await page.locator("#from").selectOption("0");
-  await page.getByLabel("Override path 1").fill("inputs.finalState");
-  await page.getByLabel("Override value 1").fill("closed");
-  await page.getByRole("button", { name: "Replay", exact: true }).click();
-  await expect(page.getByTestId("guard")).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/${vp(page)}-app-guard.png` });
-  await page.getByRole("button", { name: /retry with compensate/i }).click();
-  await expect(page.getByTestId("ledger-deleted")).toHaveText("1", { timeout: 15_000 });
-  await expect(page.getByTestId("ledger-created")).toHaveText("2");
+  await page.getByLabel("GitHub token").fill("ghp_" + "x".repeat(36));
+  await page.getByLabel("Repository (owner/name)").fill("someone/nothing");
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByRole("alert")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".banner")).toContainText("EXAMPLE RECORDING");
 });
 
 test("/app keyboard: arrow keys select steps; focus is visible", async ({ page }) => {

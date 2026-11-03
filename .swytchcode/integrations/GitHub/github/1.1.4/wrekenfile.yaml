@@ -81523,7 +81523,7 @@ STRUCTS:
     - name: model
       TYPE: STRING
       REQUIRED: false
-      comment: "The model to use for this task. The allowed models may change over time and depend on the user's GitHub Copilot plan and organization policies. Currently supported values: `claude-sonnet-4.6`, `claude-opus-4.6`, `gpt-5.2-codex`, `gpt-5.3-codex`, `gpt-5.4`, `claude-sonnet-4.5`, `claude-opus-4.5`"
+      comment: "The model to use for this task. The allowed models may change over time and depend on the user's GitHub Copilot plan and organization policies. Currently supported values: `<model-id>`, `<model-id>`, `<model-id>`, `<model-id>`, `<model-id>`, `<model-id>`, `<model-id>`"
     - name: create_pull_request
       TYPE: BOOL
       REQUIRED: false

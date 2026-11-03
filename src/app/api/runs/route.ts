@@ -1,13 +1,13 @@
+import { requireLive, resolveAccess } from "@/server/access";
 import { RunBody, errorResponse, listRuns, readJson, resolveRunExecutor, startRun, workflows } from "@/server/service";
-import { authorizeGitHubExecution, authorizeGitHubUser } from "@/server/github-access";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req?: Request) {
   try {
-    const denied = await authorizeGitHubUser();
-    if (denied) return denied;
-    return Response.json({ runs: await listRuns(), workflows: workflows() });
+    const access = await resolveAccess(req);
+    if (access instanceof Response) return access;
+    return Response.json({ runs: await listRuns(access), workflows: workflows() }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return errorResponse(e);
   }
@@ -15,18 +15,15 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const access = await resolveAccess(req);
+    if (access instanceof Response) return access;
     const body = RunBody.parse(await readJson(req));
-    const executor = resolveRunExecutor(body);
-    if (executor === "github") {
-      const denied = await authorizeGitHubExecution();
+    // Real GitHub workflows always need a connected account. (The offline simulator is only for the CLI and tests.)
+    if (resolveRunExecutor(body) === "github") {
+      const denied = requireLive(access);
       if (denied) return denied;
-      return Response.json(await startRun(body), { status: 201 });
     }
-    // The mock executor touches no real system, so anyone may use it. Only signed-in owners get their mock runs
-    // saved to the shared history; everyone else receives the full run in the response (session-only).
-    const denied = await authorizeGitHubUser();
-    if (denied && executor !== "mock") return denied;
-    return Response.json(await startRun(body, { persist: !denied }), { status: 201 });
+    return Response.json(await startRun(body, { access }), { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return errorResponse(e);
   }

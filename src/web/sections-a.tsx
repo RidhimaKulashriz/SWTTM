@@ -250,7 +250,7 @@ export function Hero() {
         <pre>
           {`input   ${JSON.stringify(cur.resolvedInput)}\n${cur.status === "error" ? `error   ${cur.error?.message}` : `output  ${JSON.stringify(cur.output)}`}\nhash    ${cur.hash.slice(0, 8)}…`}
         </pre>
-        <div className="label" style={{ marginTop: 8 }}>real data · MOCK executor</div>
+        <div className="label" style={{ marginTop: 8 }}>sample recording · offline run, not your repo</div>
       </div>
 
       <div className="herofoot">

@@ -1,14 +1,14 @@
+import { resolveAccess } from "@/server/access";
 import { errorResponse, getRun } from "@/server/service";
-import { authorizeGitHubUser } from "@/server/github-access";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const denied = await authorizeGitHubUser();
-    if (denied) return denied;
+    const access = await resolveAccess(req);
+    if (access instanceof Response) return access;
     const { id } = await ctx.params;
-    return Response.json(await getRun(id));
+    return Response.json(await getRun(id, access), { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return errorResponse(e);
   }

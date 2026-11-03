@@ -1,0 +1,70 @@
+{
+  "id": "github-triage",
+  "name": "GitHub triage: create issue, label, comment, set state (live GitHub API)",
+  "executor": "github",
+  "inputs": {
+    "owner": "OWNER",
+    "repo": "REPO",
+    "title": "swy-tm triage test",
+    "label": "bug",
+    "comment": "Triaged with swy-tm.",
+    "finalState": "closed"
+  },
+  "steps": [
+    {
+      "id": "create",
+      "canonical_id": "github.issue.create",
+      "input": { "owner": "{{inputs.owner}}", "repo": "{{inputs.repo}}", "body": { "title": "{{inputs.title}}" } },
+      "sideEffect": true,
+      "compensate": {
+        "canonical_id": "github.issue.update",
+        "input": { "owner": "{{inputs.owner}}", "repo": "{{inputs.repo}}", "issue_number": "{{steps.create.output.number}}", "body": { "state": "closed" } }
+      }
+    },
+    {
+      "id": "label",
+      "canonical_id": "github.issue.labels.create",
+      "input": {
+        "owner": "{{inputs.owner}}",
+        "repo": "{{inputs.repo}}",
+        "issue_number": "{{steps.create.output.number}}",
+        "body": { "labels": ["{{inputs.label}}"] }
+      },
+      "sideEffect": true,
+      "compensate": {
+        "canonical_id": "github.issue.labels.remove",
+        "input": { "owner": "{{inputs.owner}}", "repo": "{{inputs.repo}}", "issue_number": "{{steps.create.output.number}}", "name": "{{inputs.label}}" }
+      }
+    },
+    {
+      "id": "comment",
+      "canonical_id": "github.issue.comment.create",
+      "input": {
+        "owner": "{{inputs.owner}}",
+        "repo": "{{inputs.repo}}",
+        "issue_number": "{{steps.create.output.number}}",
+        "body": { "body": "{{inputs.comment}}" }
+      },
+      "sideEffect": true,
+      "compensate": {
+        "canonical_id": "github.issue.comment.delete",
+        "input": { "owner": "{{inputs.owner}}", "repo": "{{inputs.repo}}", "comment_id": "{{steps.comment.output.id}}" }
+      }
+    },
+    {
+      "id": "close",
+      "canonical_id": "github.issue.update",
+      "input": {
+        "owner": "{{inputs.owner}}",
+        "repo": "{{inputs.repo}}",
+        "issue_number": "{{steps.create.output.number}}",
+        "body": { "state": "{{inputs.finalState}}" }
+      },
+      "sideEffect": true,
+      "compensate": {
+        "canonical_id": "github.issue.update",
+        "input": { "owner": "{{inputs.owner}}", "repo": "{{inputs.repo}}", "issue_number": "{{steps.create.output.number}}", "body": { "state": "open" } }
+      }
+    }
+  ]
+}

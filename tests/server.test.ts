@@ -62,23 +62,16 @@ describe("api routes", () => {
     expect((await replay.POST(post({ fromStep: -1 }), ctx({ id: "r_missing" }))).status).toBe(400);
   });
 
-  it("refuses real GitHub execution until credentials, auth, and durable storage are configured", async () => {
-    const names = ["GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO", "GITHUB_ALLOWED_EMAIL", "NEON_AUTH_BASE_URL", "NEON_AUTH_COOKIE_SECRET", "DATABASE_URL"];
-    const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
-    names.forEach((name) => delete process.env[name]);
-    try {
-      const runs = await import("../src/app/api/runs/route");
-      const result = await runs.POST(post({ workflow: "github-issue", executor: "github" }));
-      expect(result.status).toBe(503);
-      expect((await result.json()).error).toContain("Live GitHub execution is not configured");
-      const implicit = await runs.POST(post({ workflow: "github-issue" }));
-      expect(implicit.status).toBe(503);
-      expect((await implicit.json()).error).toContain("Live GitHub execution is not configured");
-    } finally {
-      names.forEach((name) => {
-        if (previous[name] === undefined) delete process.env[name];
-        else process.env[name] = previous[name];
-      });
+  it("refuses real GitHub execution until a GitHub account is connected", async () => {
+    const runs = await import("../src/app/api/runs/route");
+    for (const body of [{ workflow: "github-issue", executor: "github" }, { workflow: "github-issue" }]) {
+      const result = await runs.POST(post(body));
+      expect(result.status).toBe(401);
+      expect(((await result.json()) as { code: string }).code).toBe("connect_required");
     }
+    const bad = await runs.POST(
+      new Request("http://x/api/runs", { method: "POST", body: JSON.stringify({ workflow: "github-issue" }), headers: { "x-gh-token": "not a token", "x-gh-repo": "a/b" } }),
+    );
+    expect(bad.status).toBe(400);
   });
 });
