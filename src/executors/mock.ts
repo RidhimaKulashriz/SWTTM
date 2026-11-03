@@ -1,13 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { ExecResult, Executor } from "../core/types";
+import type { ExecResult, Executor, Snapshot } from "../core/types";
 
 export type Ledger = { created: number; deleted: number; labeled: number; unlabeled: number; updated: number };
 type Issue = { id: number; title: string; state: "open" | "closed"; labels: string[]; created_at: string };
 export type MockState = { nextId: number; issues: Record<string, Issue>; ledger: Ledger };
 type Db = MockState;
 
-const empty = (): Db => ({
+export const emptyMockState = (): MockState => ({
   nextId: 1,
   issues: {},
   ledger: { created: 0, deleted: 0, labeled: 0, unlabeled: 0, updated: 0 },
@@ -26,7 +26,7 @@ export class MockExecutor implements Executor {
     try {
       return JSON.parse(fs.readFileSync(this.file, "utf8")) as Db;
     } catch {
-      return empty();
+      return emptyMockState();
     }
   }
   private save(db: Db) {
@@ -39,7 +39,7 @@ export class MockExecutor implements Executor {
     return this.load().ledger;
   }
   reset() {
-    this.save(empty());
+    this.save(emptyMockState());
   }
 
   async exec(canonicalId: string, input: unknown, ctx: { dryRun: boolean }): Promise<ExecResult> {
@@ -115,4 +115,24 @@ export class MockExecutor implements Executor {
     this.save(db);
     return res;
   }
+}
+
+/**
+ * Rebuild the fake tracker's state (issues + ledger) by re-applying a run's recorded side effects in order.
+ * This lets a run be replayed on stateless hosts (serverless, read-only disks) without any file on disk.
+ */
+export async function rebuildMockState(snapshots: Snapshot[]): Promise<MockState> {
+  const state = emptyMockState();
+  const ex = new MockExecutor("", state);
+  for (const snap of [...snapshots].sort((a, b) => a.seq - b.seq)) {
+    if ((snap.status !== "ok" && snap.status !== "injected") || !snap.sideEffect) continue;
+    const out = snap.output as { dryRun?: unknown } | null | undefined;
+    if (out && typeof out === "object" && out.dryRun === true) continue;
+    // keep recorded ids stable, even when this run's parent (which created the issue) is not part of the supplied data
+    const recordedId = (snap.output as { id?: unknown } | null | undefined)?.id;
+    if (snap.canonicalId === "tracker.issue.create" && typeof recordedId === "number") state.nextId = recordedId;
+    await ex.exec(snap.canonicalId, snap.resolvedInput, { dryRun: false });
+    state.nextId = Math.max(state.nextId, ...Object.keys(state.issues).map((k) => Number(k) + 1), 1);
+  }
+  return state;
 }

@@ -33,6 +33,10 @@ Configure these values as server-side environment variables in the deployment (f
 
 After setting the variables, redeploy the application. `/api/health` must report `github.ready: true` and `database: true`. Sign in at `/auth/sign-in` with the configured allowed email. Live execution and run/snapshot/diff/ledger APIs reject unauthenticated or other-account requests. The executor rejects any workflow owner/repo that does not exactly match the server allowlist. Without these settings the live action stays disabled; sample data remains labelled as preview, not as a completed real run.
 
+## Using the debugger without signing in
+
+The mock demo, replay, compensate and hash-chain verification work for everyone, with or without a database or login. The mock executor touches no real system, so it is never gated. Runs the server cannot look up itself (the bundled sample preview, serverless instances that share no history, signed-out visitors) are sent back with the request and verified against their hash chain before they are replayed, and only `mock` runs are accepted this way. Signed-in owners additionally get runs saved to history; live GitHub execution and private run history always stay behind sign-in.
+
 ## Problem and intended user
 When step 3 of a 3-step agent workflow fails, steps 1–2 already created real side effects. Re-running everything risks duplicates; audit logs say *that* it failed, not what state step 2 left behind, and you cannot change one input and re-run only the tail. Intended user: someone building agent workflows on Swytchcode methods.
 

@@ -1,16 +1,19 @@
 import { z } from "zod";
 import { diffRuns } from "../core/diff";
-import { replayRun, runWorkflow, verifyRun } from "../core/engine";
+import { replayRun, runWorkflow, verifyRun, verifySnapshots } from "../core/engine";
 import { MemoryStore } from "../core/memory-store";
-import { Store } from "../core/store";
-import { TmError, WorkflowSchema, type Snapshot } from "../core/types";
+import { Store, assertRunId } from "../core/store";
+import { TmError, WorkflowSchema, type Manifest, type Snapshot } from "../core/types";
 import { listWorkflows, loadNamedWorkflow } from "../core/workflows";
 import { createExecutor, mockLedger } from "../executors/executor";
+import { emptyMockState, rebuildMockState, type MockState } from "../executors/mock";
 import { detectBinary } from "../executors/swytchcode";
 import { githubCredentialsConfigured, githubReady } from "../executors/github";
 import { getStoredRun, listStoredRuns, listStoredRunsWithSnapshots, saveRun } from "../db/runs";
 
-export const store = () => (process.env.VERCEL ? new MemoryStore() : new Store());
+const mem = globalThis as unknown as { __swytmMem?: MemoryStore };
+/** Serverless hosts have a read-only disk, so they use one process-wide in-memory store (warm instances share it). */
+export const store = (): Store => (process.env.VERCEL ? (mem.__swytmMem ??= new MemoryStore()) : new Store());
 const databaseEnabled = process.env.NODE_ENV !== "test" && Boolean(process.env.DATABASE_URL);
 
 /* ---- tiny in-memory event bus for SSE (single Node process) ---- */
@@ -46,6 +49,14 @@ export const RunBody = z.object({
   dryRun: z.boolean().default(false),
   streamId: StreamId,
 });
+/** A mock run sent back by the client so it can be replayed/verified on stateless hosts and without sign-in. */
+export const SeedSchema = z.object({
+  manifest: z.custom<Manifest>((v) => Boolean(v) && typeof v === "object"),
+  snapshots: z.array(z.custom<Snapshot>((v) => Boolean(v) && typeof v === "object")).min(1).max(200),
+});
+export type Seed = z.infer<typeof SeedSchema>;
+export const VerifyBody = z.object({ seed: SeedSchema.optional() });
+
 export const ReplayBody = z.object({
   fromStep: z.union([z.number().int().min(0), z.string().min(1).max(64)]),
   set: SetList,
@@ -53,6 +64,7 @@ export const ReplayBody = z.object({
   allowDuplicate: z.boolean().default(false),
   dryRun: z.boolean().default(false),
   streamId: StreamId,
+  seed: SeedSchema.optional(),
 });
 
 export function health() {
@@ -111,9 +123,7 @@ function isDryRunOutput(output: unknown): boolean {
   return Boolean(output && typeof output === "object" && "dryRun" in output && (output as { dryRun?: unknown }).dryRun === true);
 }
 
-export async function getLedger() {
-  if (!databaseEnabled) return { mock: true, ledger: mockLedger(store()) };
-  const runs = await listStoredRunsWithSnapshots();
+function countLedger(runs: { manifest: Manifest; snapshots: Snapshot[] }[]) {
   const ledger = { created: 0, deleted: 0, labeled: 0, unlabeled: 0, updated: 0 };
   for (const run of runs) {
     for (const snapshot of run.snapshots) {
@@ -128,17 +138,38 @@ export async function getLedger() {
   return { mock: runs.every((run) => run.manifest.mock), ledger };
 }
 
-export async function getVerify(id: string) {
-  const stored = databaseEnabled ? await getStoredRun(id) : null;
-  if (stored) {
-    let prev: string | null = null;
-    for (let i = 0; i < stored.snapshots.length; i++) {
-      const current = stored.snapshots[i];
-      if (current.seq !== i || current.prevHash !== prev) return { ok: false, checked: i };
-      prev = current.hash;
-    }
-    return { ok: true, checked: stored.snapshots.length };
+export async function getLedger() {
+  if (!databaseEnabled) {
+    const s = store();
+    // serverless: the fake tracker has no file, so count the side effects recorded in the in-memory runs
+    if (s instanceof MemoryStore) return countLedger(s.listRuns().map((manifest) => ({ manifest, snapshots: s.readSnapshots(manifest.runId) })));
+    return { mock: true, ledger: mockLedger(s) };
   }
+  return countLedger(await listStoredRunsWithSnapshots());
+}
+
+/** Validate a client-supplied mock run (shape, mock-only, hash chain) and load it into a private in-memory store. */
+export function loadSeed(seed: Seed): { store: MemoryStore; manifest: Manifest; snapshots: Snapshot[] } {
+  const manifest = seed.manifest;
+  const runId = assertRunId(String(manifest.runId));
+  if (manifest.executor !== "mock" || manifest.mock !== true) {
+    throw new TmError("Only mock-executor runs can be replayed or verified without signing in.", 2);
+  }
+  WorkflowSchema.parse(manifest.workflow);
+  const ordered = [...seed.snapshots].sort((a, b) => a.seq - b.seq);
+  if (ordered.some((x) => x.runId !== runId)) throw new TmError("Snapshots do not belong to the supplied run.", 4);
+  const check = verifySnapshots(ordered);
+  if (!check.ok) throw new TmError(`Supplied run failed hash-chain verification: ${check.reason}`, 4);
+  const ms = new MemoryStore();
+  ms.writeManifest(manifest);
+  for (const snap of ordered) ms.writeSnapshot(snap);
+  return { store: ms, manifest, snapshots: ordered };
+}
+
+export async function getVerify(id: string, seed?: Seed) {
+  if (seed) return verifySnapshots(loadSeed(seed).snapshots);
+  const stored = databaseEnabled ? await getStoredRun(id) : null;
+  if (stored) return verifySnapshots([...stored.snapshots].sort((a, b) => a.seq - b.seq));
   return verifyRun(store(), id);
 }
 
@@ -151,41 +182,62 @@ export function resolveRunExecutor(body: z.infer<typeof RunBody>) {
   return body.executor ?? workflow.executor;
 }
 
-function exec(name: "mock" | "swytchcode" | "github", currentStore: Store) {
+function exec(name: "mock" | "swytchcode" | "github", currentStore: Store, mockState?: MockState) {
   if (name === "swytchcode" && !detectBinary()) throw new TmError("swytchcode CLI not found on PATH; use executor=mock", 2);
   if (name === "github" && !githubReady()) throw new TmError("Live GitHub execution requires GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, Neon Auth, an allowed email, and PostgreSQL configuration.", 7);
-  return createExecutor(name, currentStore);
+  return createExecutor(name, currentStore, undefined, mockState);
 }
 
-export async function startRun(body: z.infer<typeof RunBody>) {
+export async function startRun(body: z.infer<typeof RunBody>, opts: { persist?: boolean } = {}) {
+  const persist = opts.persist ?? true;
   const currentStore = store();
   const wf = loadNamedWorkflow(body.workflow);
   const workflow = WorkflowSchema.parse(wf);
   const executorName = body.executor ?? workflow.executor;
   const r = await runWorkflow(wf, {
     store: currentStore,
-    executor: exec(executorName, currentStore),
+    // in-memory MemoryStore (serverless) => in-memory fake tracker; file store => file-backed tracker
+    executor: exec(executorName, currentStore, executorName === "mock" && currentStore instanceof MemoryStore ? emptyMockState() : undefined),
     overrides: body.set,
     dryRun: body.dryRun,
     hooks: { onStep: (snap) => publish(body.streamId, { type: "step", data: snap }) },
   });
   publish(body.streamId, { type: "done", data: { runId: r.manifest.runId, outcome: r.manifest.outcome } });
-  if (databaseEnabled) await saveRun(r.manifest, r.snapshots);
-  return { runId: r.manifest.runId, outcome: r.manifest.outcome, executorCalls: r.executorCalls };
+  if (databaseEnabled && persist) await saveRun(r.manifest, r.snapshots);
+  return { runId: r.manifest.runId, outcome: r.manifest.outcome, executorCalls: r.executorCalls, manifest: r.manifest, snapshots: r.snapshots };
 }
 
-export async function startReplay(id: string, body: z.infer<typeof ReplayBody>) {
-  const s = store();
-  const stored = databaseEnabled ? await getStoredRun(id) : null;
-  if (stored) {
-    s.writeManifest(stored.manifest);
-    for (const snapshot of stored.snapshots) s.writeSnapshot(snapshot);
+export async function startReplay(id: string, body: z.infer<typeof ReplayBody>, opts: { persist?: boolean } = {}) {
+  let s: Store;
+  let fromDb = false;
+  const persist = opts.persist ?? true;
+  if (body.seed) {
+    // stateless path: the client supplied the (verified, mock-only) run
+    const seeded = loadSeed(body.seed);
+    if (seeded.manifest.runId !== id) throw new TmError("Supplied run id does not match the URL.", 2);
+    s = seeded.store;
+  } else {
+    s = store();
+    const stored = databaseEnabled ? await getStoredRun(id) : null;
+    if (stored) {
+      fromDb = true;
+      s.writeManifest(stored.manifest);
+      const have = new Set<number>();
+      try {
+        for (const x of s.readSnapshots(id)) have.add(x.seq);
+      } catch {
+        /* run not in the local store yet */
+      }
+      for (const snapshot of [...stored.snapshots].sort((a, b) => a.seq - b.seq)) if (!have.has(snapshot.seq)) s.writeSnapshot(snapshot);
+    }
   }
   const orig = s.readManifest(id);
+  const mockState =
+    orig.executor === "mock" && (body.seed || fromDb || s instanceof MemoryStore) ? await rebuildMockState(s.readSnapshots(id)) : undefined;
   try {
     const r = await replayRun({
       store: s,
-      executor: exec(orig.executor, s),
+      executor: exec(orig.executor, s, mockState),
       runId: id,
       fromStep: body.fromStep,
       overrides: body.set,
@@ -195,13 +247,15 @@ export async function startReplay(id: string, body: z.infer<typeof ReplayBody>) 
       hooks: { onStep: (snap) => publish(body.streamId, { type: "step", data: snap }) },
     });
     publish(body.streamId, { type: "done", data: { runId: r.manifest.runId, outcome: r.manifest.outcome } });
-    if (databaseEnabled) await saveRun(r.manifest, r.snapshots);
+    if (databaseEnabled && persist) await saveRun(r.manifest, r.snapshots);
     return {
       runId: r.manifest.runId,
       outcome: r.manifest.outcome,
       executorCalls: r.executorCalls,
       injected: r.injected,
       compensated: r.compensated,
+      manifest: r.manifest,
+      snapshots: r.snapshots,
       diff: diffRuns({ runId: id, steps: s.readSteps(id) }, { runId: r.manifest.runId, steps: s.readSteps(r.manifest.runId) }),
     };
   } catch (e) {

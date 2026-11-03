@@ -28,6 +28,31 @@ async function api<T>(url: string, init?: RequestInit): Promise<{ ok: boolean; s
   return { ok: r.ok, status: r.status, body };
 }
 
+const JSON_HEADERS = { "content-type": "application/json" };
+const newestFirst = (a: Manifest, b: Manifest) => b.createdAt.localeCompare(a.createdAt);
+
+/** Only mock runs may be sent back to the server to be replayed/verified statelessly. */
+function seedOf(d: RunData | null): { manifest: Manifest; snapshots: Snapshot[] } | undefined {
+  if (!d || d.manifest.executor !== "mock" || !d.manifest.mock || !d.manifest.workflow) return undefined;
+  return { manifest: d.manifest, snapshots: d.snapshots };
+}
+
+function ledgerOf(runs: RunData[]): Ledger {
+  const l: Ledger = { created: 0, deleted: 0, labeled: 0, unlabeled: 0, updated: 0 };
+  for (const run of runs) {
+    for (const x of run.snapshots) {
+      const out = x.output as { dryRun?: unknown } | null | undefined;
+      if (x.status !== "ok" || (out && typeof out === "object" && out.dryRun === true)) continue;
+      if (x.canonicalId === "tracker.issue.create" || x.canonicalId === "github.issue.create") l.created++;
+      if (x.canonicalId === "tracker.issue.delete") l.deleted++;
+      if (x.canonicalId === "tracker.issue.label" || x.canonicalId === "github.issue.labels.create") l.labeled++;
+      if (x.canonicalId === "tracker.issue.unlabel") l.unlabeled++;
+      if (x.canonicalId === "tracker.issue.update" || x.canonicalId === "github.issue.update") l.updated++;
+    }
+  }
+  return l;
+}
+
 export default function Debugger({ initialRun, initialStep }: { initialRun?: string; initialStep?: number }) {
   const [loading, setLoading] = useState(true);
   const [apiUp, setApiUp] = useState(false);
@@ -58,58 +83,82 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
   const [guard, setGuard] = useState<{ message: string; guarded: string[] } | null>(null);
   const [error, setError] = useState("");
   const search = useRef<HTMLInputElement>(null);
+  /** runs held in this browser session (anonymous / serverless mode, where the server keeps no history) */
+  const session = useRef<RunData[]>([]);
+  /** ids the server itself can serve */
+  const serverIds = useRef<Set<string>>(new Set());
+  const remember = (run: RunData | undefined) => {
+    if (!run?.manifest || !Array.isArray(run.snapshots)) return;
+    session.current = [run, ...session.current.filter((x) => x.manifest.runId !== run.manifest.runId)];
+  };
 
   const say = (m: string) => {
     setToast(m);
     setTimeout(() => setToast(""), 2600);
   };
 
-  /* ---- load runs (live API, else bundled static demo) ---- */
+  /* ---- load runs (server history + this session's runs, else the bundled sample preview) ---- */
   const loadRuns = useCallback(async (select?: string) => {
+    let server: Manifest[] = [];
+    let reachable = false;
+    let auth = false;
     try {
       const r = await api<{ runs: Manifest[]; workflows: string[] }>("/api/runs");
-      if (!r.ok && [401, 403, 503].includes(r.status)) {
-        setApiUp(true);
-        setNeedsAuth(r.status === 401 || r.status === 403);
-        setLive(false);
-        setRuns(demo.runs.map((x) => x.manifest));
-        const preview = demo.runs.find((x) => x.manifest.runId === (select ?? initialRun)) ?? demo.runs[0];
-        setRunId(preview?.manifest.runId);
-        setData(preview ?? null);
-        setLoading(false);
-        return;
+      if (r.ok && Array.isArray(r.body.runs)) {
+        reachable = true;
+        server = r.body.runs;
+        setWorkflows(r.body.workflows ?? []);
+      } else if ([401, 403, 503].includes(r.status)) {
+        reachable = true;
+        auth = r.status === 401 || r.status === 403;
       }
-      if (!r.ok) throw new Error("api");
-      setApiUp(true);
-      setNeedsAuth(false);
-      setWorkflows(r.body.workflows);
-      if (r.body.runs.length) {
-        setLive(true);
-        setRuns(r.body.runs);
-        setRunId((cur) => select ?? (cur && r.body.runs.some((x) => x.runId === cur) ? cur : r.body.runs[0].runId));
-      } else {
-        setLive(false);
-        setRuns(demo.runs.map((x) => x.manifest));
-        const preview = demo.runs.find((x) => x.manifest.runId === (select ?? initialRun)) ?? demo.runs[0];
-        setRunId(preview?.manifest.runId);
-        setData(preview ?? null);
-      }
-    } catch (e) {
+    } catch {
+      /* API unreachable: fall through to session/preview data */
+    }
+    serverIds.current = new Set(server.map((x) => x.runId));
+    setApiUp(reachable);
+    setNeedsAuth(auth);
+    const local = session.current.filter((x) => !serverIds.current.has(x.manifest.runId)).map((x) => x.manifest);
+    const merged = [...local, ...server].sort(newestFirst);
+    if (merged.length) {
+      setLive(true);
+      setRuns(merged);
+      setRunId((cur) => select ?? (cur && merged.some((x) => x.runId === cur) ? cur : merged[0].runId));
+    } else {
       setLive(false);
-      setApiUp(false);
       setRuns(demo.runs.map((x) => x.manifest));
       const preview = demo.runs.find((x) => x.manifest.runId === (select ?? initialRun)) ?? demo.runs[0];
-      setRunId((cur) => select ?? (cur && demo.runs.some((x) => x.manifest.runId === cur) ? cur : preview?.manifest.runId));
+      setRunId(preview?.manifest.runId);
       setData(preview ?? null);
+      setFrom(preview?.manifest.failedStep ?? 0);
+      setStep((st) => Math.min(st, Math.max((preview?.snapshots.length ?? 1) - 1, 0)));
     }
     setLoading(false);
   }, [initialRun]);
 
   const loadLedger = useCallback(async (isLive: boolean) => {
     if (!isLive) return setLedger({ ledger: demo.ledger, static: true, mock: true });
-    const r = await api<{ ledger: Ledger; mock: boolean }>("/api/ledger");
-    if (r.ok) setLedger({ ledger: r.body.ledger, static: false, mock: r.body.mock });
-    else setError("Live ledger could not be loaded from the backend.");
+    // runs only this browser knows about (anonymous / serverless) are added on top of what the server has stored
+    const extra = ledgerOf(session.current.filter((x) => !serverIds.current.has(x.manifest.runId)));
+    if (serverIds.current.size === 0) return setLedger({ ledger: extra, static: false, mock: true });
+    try {
+      const r = await api<{ ledger: Ledger; mock: boolean }>("/api/ledger");
+      if (!r.ok) return setLedger({ ledger: ledgerOf(session.current), static: false, mock: true });
+      const l = r.body.ledger;
+      setLedger({
+        ledger: {
+          created: l.created + extra.created,
+          deleted: l.deleted + extra.deleted,
+          labeled: l.labeled + extra.labeled,
+          unlabeled: l.unlabeled + extra.unlabeled,
+          updated: l.updated + extra.updated,
+        },
+        static: false,
+        mock: r.body.mock,
+      });
+    } catch {
+      setLedger({ ledger: ledgerOf(session.current), static: false, mock: true });
+    }
   }, []);
 
   useEffect(() => {
@@ -130,27 +179,38 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
 
   /* ---- load selected run ---- */
   useEffect(() => {
-    if (!runId) return;
+    if (!runId || !live) return;
     let cancelled = false;
-    if (!live) return;
     (async () => {
-      const r = await api<RunData>(`/api/runs/${encodeURIComponent(runId)}`);
-      const d = r.ok ? r.body : null;
-      if (!r.ok) setError(`Could not load live run ${runId}`);
+      let d: RunData | null = session.current.find((x) => x.manifest.runId === runId) ?? null;
+      if (!d) {
+        try {
+          const r = await api<RunData>(`/api/runs/${encodeURIComponent(runId)}`);
+          d = r.ok && r.body.manifest ? r.body : null;
+          if (!r.ok) setError(`Could not load run ${runId}`);
+        } catch {
+          setError(`Could not load run ${runId}`);
+        }
+      }
       if (cancelled || !d) return;
       setData(d);
       setError("");
       const m = d.manifest;
       setFrom(m.failedStep ?? 0);
-      setStep((s) => Math.min(s, m.steps.length - 1));
+      setStep((st) => Math.min(st, Math.max(m.steps.length - 1, 0)));
       // divergence vs parent
       if (m.parentRunId) {
-        if (live) {
-          const r = await api<DiffResult>(`/api/diff?a=${m.parentRunId}&b=${m.runId}`);
-          if (!cancelled && r.ok) setDiff(r.body);
+        const parent = session.current.find((x) => x.manifest.runId === m.parentRunId);
+        if (parent) {
+          const strip = (x: Snapshot[]) => x.filter((y) => !y.stepId.endsWith(":compensate"));
+          setDiff(diffRuns({ runId: parent.manifest.runId, steps: strip(parent.snapshots) }, { runId: m.runId, steps: strip(d.snapshots) }));
         } else {
-          const p = demo.runs.find((x) => x.manifest.runId === m.parentRunId);
-          if (p) setDiff(diffRuns({ runId: p.manifest.runId, steps: p.snapshots }, { runId: m.runId, steps: d.snapshots }));
+          try {
+            const r = await api<DiffResult>(`/api/diff?a=${encodeURIComponent(m.parentRunId)}&b=${encodeURIComponent(m.runId)}`);
+            if (!cancelled) setDiff(r.ok ? r.body : null);
+          } catch {
+            if (!cancelled) setDiff(null);
+          }
         }
       } else setDiff(null);
     })();
@@ -166,7 +226,8 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
   }, [runId, step]);
 
   const main = useMemo(() => (data ? data.snapshots.filter((s) => !s.stepId.endsWith(":compensate")) : []), [data]);
-  const snap = main[step];
+  const si = Math.min(Math.max(step, 0), Math.max(main.length - 1, 0));
+  const snap = main[si];
 
   /* ---- keyboard ---- */
   useEffect(() => {
@@ -175,7 +236,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
       if (/INPUT|SELECT|TEXTAREA/.test(t.tagName)) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setStep((s) => Math.min(main.length - 1, s + 1));
+        setStep((s) => Math.max(0, Math.min(main.length - 1, s + 1)));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setStep((s) => Math.max(0, s - 1));
@@ -209,28 +270,39 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
     setGuard(null);
     setError("");
     const streamId = `s_${Math.random().toString(36).slice(2, 10)}`;
-    const es = new EventSource(`/api/stream/${streamId}`);
-    es.addEventListener("step", (ev) => setEvents((x) => [...x, JSON.parse((ev as MessageEvent).data) as Snapshot]));
-    es.addEventListener("done", () => es.close());
-    es.onerror = () => es.close();
+    let es: EventSource | undefined;
+    try {
+      es = new EventSource(`/api/stream/${streamId}`);
+      es.addEventListener("step", (ev) => setEvents((x) => [...x, JSON.parse((ev as MessageEvent).data) as Snapshot]));
+      es.addEventListener("done", () => es?.close());
+      es.onerror = () => es?.close();
+    } catch {
+      es = undefined;
+    }
     try {
       await start(streamId);
+    } catch (e) {
+      setError(`Request failed: ${(e as Error).message || "the API is unreachable"}`);
     } finally {
-      setTimeout(() => es.close(), 500);
+      setTimeout(() => es?.close(), 500);
       setBusy(false);
     }
   };
 
+  /** the live stream may be unavailable (signed out, serverless): fall back to the snapshots in the response */
+  const showEvents = (snaps: Snapshot[] | undefined) => setEvents((cur) => (cur.length || !snaps ? cur : snaps));
+
   const runWorkflow = (name: string) =>
     stream(async (streamId) => {
-      const r = await api<{ runId: string; error?: string }>("/api/runs", {
+      const r = await api<{ runId: string; error?: string; manifest?: Manifest; snapshots?: Snapshot[] }>("/api/runs", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ workflow: name, executor: "mock", set: [], streamId }),
       });
       if (!r.ok) return setError(r.body.error ?? "Run failed");
+      if (r.body.manifest && r.body.snapshots) remember({ manifest: r.body.manifest, snapshots: r.body.snapshots });
+      showEvents(r.body.snapshots);
       say(`Mock demo run ${r.body.runId} created`);
-      setLive(true);
       await loadRuns(r.body.runId);
       setStep(0);
       loadLedger(true);
@@ -242,9 +314,9 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
       const set = Object.entries({ owner, repo, title: issueTitle.trim(), label: issueLabel.trim(), finalState }).map(
         ([key, value]) => `inputs.${key}=${JSON.stringify(value)}`,
       );
-      const r = await api<{ runId: string; error?: string }>("/api/runs", {
+      const r = await api<{ runId: string; error?: string; manifest?: Manifest; snapshots?: Snapshot[] }>("/api/runs", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ workflow: "github-issue", executor: "github", set, streamId }),
       });
       if (!r.ok) {
@@ -252,8 +324,9 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
         return setError(r.body.error ?? "Live GitHub run failed");
       }
       setError("");
+      if (r.body.manifest && r.body.snapshots) remember({ manifest: r.body.manifest, snapshots: r.body.snapshots });
+      showEvents(r.body.snapshots);
       say(`Live GitHub run ${r.body.runId} saved with step snapshots`);
-      setLive(true);
       await loadRuns(r.body.runId);
       setStep(0);
       loadLedger(true);
@@ -262,16 +335,39 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
   const replay = (forceCompensate = false) =>
     stream(async (streamId) => {
       if (!data) return;
-      const r = await api<{ runId: string; diff: DiffResult; error?: string; details?: { guarded?: string[]; missingCompensate?: string[] } }>(
-        `/api/runs/${encodeURIComponent(data.manifest.runId)}/replay`,
-        {
+      const parent = data;
+      const known = serverIds.current.has(parent.manifest.runId);
+      const seed = seedOf(parent);
+      if (!seed && !known) {
+        return setError("This run is not stored on the server and cannot be replayed. Sign in to replay saved GitHub runs.");
+      }
+      type ReplayResp = {
+        runId: string;
+        diff: DiffResult;
+        error?: string;
+        manifest?: Manifest;
+        snapshots?: Snapshot[];
+        details?: { guarded?: string[]; missingCompensate?: string[] };
+      };
+      // Runs the server stores are replayed there (and saved to its history). Anything else (sample preview, serverless
+      // instances with no shared history, signed-out visitors) is sent along with the request: mock runs only, hash-verified.
+      const call = (withSeed: boolean) =>
+        api<ReplayResp>(`/api/runs/${encodeURIComponent(parent.manifest.runId)}/replay`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ fromStep: from, set: setStrings, compensate: compensate || forceCompensate, allowDuplicate: allowDup, dryRun, streamId }),
-        },
-      );
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ fromStep: from, set: setStrings, compensate: compensate || forceCompensate, allowDuplicate: allowDup, dryRun, streamId, ...(withSeed && seed ? { seed } : {}) }),
+        });
+      let usedSeed = !known;
+      let r = await call(usedSeed);
+      if (r.status === 404 && seed && !usedSeed) {
+        usedSeed = true;
+        r = await call(true);
+      }
       if (r.status === 409) return setGuard({ message: r.body.error ?? "Guard abort", guarded: r.body.details?.guarded ?? [] });
       if (!r.ok) return setError(r.body.error ?? "Replay failed");
+      if (usedSeed) remember(parent);
+      if (r.body.manifest && r.body.snapshots) remember({ manifest: r.body.manifest, snapshots: r.body.snapshots });
+      showEvents(r.body.snapshots);
       say(`Replay ${r.body.runId} complete`);
       setDiff(r.body.diff);
       await loadRuns(r.body.runId);
@@ -280,9 +376,24 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
     });
 
   const verify = async () => {
-    if (!runId || !live) return;
-    const r = await api<{ ok: boolean; checked: number; reason?: string }>(`/api/runs/${runId}/verify`, { method: "POST" });
-    say(r.body.ok ? `Hash chain OK (${r.body.checked} snapshots)` : `Chain BROKEN: ${r.body.reason}`);
+    if (!runId || !data) return;
+    const known = serverIds.current.has(runId);
+    const seed = seedOf(data);
+    type VerifyResp = { ok: boolean; checked: number; reason?: string; error?: string };
+    const call = (withSeed: boolean) =>
+      api<VerifyResp>(`/api/runs/${encodeURIComponent(runId)}/verify`, {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify(withSeed && seed ? { seed } : {}),
+      });
+    try {
+      let r = await call(!known);
+      if (r.status === 404 && seed && known) r = await call(true);
+      if (!r.ok) return say(r.body.error ?? "Verify failed");
+      say(r.body.ok ? `Hash chain OK (${r.body.checked} snapshots)` : `Chain BROKEN: ${r.body.reason ?? "unknown reason"}`);
+    } catch {
+      say("Verify failed: API unreachable");
+    }
   };
 
   const tabValue = (s: Snapshot): unknown =>
@@ -315,11 +426,11 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
         </select>
         {m && <span className={`badge ${m.executor === "github" ? "real" : "mock"}`} title={!live ? "Bundled sample snapshots; no live run has been selected." : undefined}>{executorLabel}</span>}
         <span style={{ flex: 1 }} />
-        {!github.ready && <button className="btn sm" disabled={!apiUp || busy} onClick={() => runWorkflow("demo-tracker")}>Run mock demo</button>}
-        <button className="btn sm ghost" disabled={!live || busy || !data} onClick={() => replay()}>
+        <button className="btn sm" disabled={!apiUp || busy} onClick={() => runWorkflow("demo-tracker")}>Run mock demo</button>
+        <button className="btn sm ghost" disabled={busy || !data} onClick={() => replay()}>
           Replay from step {from}
         </button>
-        <button className="btn sm ghost" disabled={!live || !data} onClick={verify}>
+        <button className="btn sm ghost" disabled={!data} onClick={verify}>
           Verify chain
         </button>
       </div>
@@ -358,7 +469,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
           </div>
           {loading && <div className="label caret">Loading runs</div>}
           {!loading && data && !data.snapshots.length && <div className="label">No snapshots yet. Run a workflow.</div>}
-          <div role="listbox" aria-label="Steps" aria-activedescendant={main[step] ? `st-${step}` : undefined}>
+          <div role="listbox" aria-label="Steps" aria-activedescendant={snap ? `st-${si}` : undefined}>
             {data?.snapshots.map((s) => {
               const compensation = s.stepId.endsWith(":compensate");
               const mainIndex = main.indexOf(s);
@@ -367,7 +478,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
                   key={s.seq}
                   id={compensation ? undefined : `st-${mainIndex}`}
                   role="option"
-                  aria-selected={!compensation && mainIndex === step}
+                  aria-selected={!compensation && mainIndex === si}
                   className="step"
                   style={compensation ? { opacity: 0.8 } : undefined}
                   onClick={() => { if (!compensation) setStep(mainIndex); }}
@@ -388,7 +499,7 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
               );
             })}
           </div>
-          {main.length > 0 && <TimelineScrubber steps={main.map((s) => ({ id: s.stepId, status: s.status }))} value={step} onChange={(v) => setStep(Math.round(v))} onCommit={setStep} />}
+          {main.length > 0 && <TimelineScrubber steps={main.map((s) => ({ id: s.stepId, status: s.status }))} value={si} onChange={(v) => setStep(Math.round(v))} onCommit={setStep} />}
           <div className="label" style={{ marginTop: 16 }}>Side-effect ledger {ledger?.static ? "(bundled sample preview)" : ledger?.mock ? "(live mock demo)" : "(live GitHub activity)"}</div>
           {ledger && (
             <div className="kv" data-testid="ledger" style={{ marginTop: 6 }}>
@@ -457,10 +568,10 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
             <label><input type="checkbox" checked={allowDup} onChange={(e) => setAllowDup(e.target.checked)} /> Allow duplicate</label>
             <label><input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} /> Dry run</label>
           </div>
-          <button className="btn" disabled={!live || busy || !formValid || !data} onClick={() => replay()} style={{ width: "100%", justifyContent: "center" }}>
+          <button className="btn" disabled={busy || !formValid || !data} onClick={() => replay()} style={{ width: "100%", justifyContent: "center" }}>
             {busy ? "Replaying…" : "Replay"}
           </button>
-          {!live && <div className="label" style={{ marginTop: 8 }}>Replay needs live runs (run `swy-tm serve`, then RUN WORKFLOW).</div>}
+          {!live && <div className="label" style={{ marginTop: 8 }}>Sample preview: replaying re-runs the tail on the mock executor and keeps the result in this browser session.</div>}
 
           {guard && (
             <div className="warn" role="alert" data-testid="guard">

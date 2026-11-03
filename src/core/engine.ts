@@ -375,8 +375,7 @@ export async function replayRun(o: ReplayOptions): Promise<ReplayResult> {
 /* verify                                                               */
 /* ------------------------------------------------------------------ */
 
-export function verifyRun(store: Store, runId: string): { ok: boolean; checked: number; reason?: string } {
-  const snaps = store.readSnapshots(runId);
+export function verifySnapshots(snaps: Snapshot[]): { ok: boolean; checked: number; reason?: string } {
   let prev: string | null = null;
   for (let i = 0; i < snaps.length; i++) {
     const s = snaps[i];
@@ -387,4 +386,8 @@ export function verifyRun(store: Store, runId: string): { ok: boolean; checked: 
     prev = s.hash;
   }
   return { ok: true, checked: snaps.length };
+}
+
+export function verifyRun(store: Store, runId: string): { ok: boolean; checked: number; reason?: string } {
+  return verifySnapshots(store.readSnapshots(runId));
 }

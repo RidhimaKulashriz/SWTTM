@@ -16,11 +16,17 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = RunBody.parse(await readJson(req));
-    if (resolveRunExecutor(body) === "github") {
+    const executor = resolveRunExecutor(body);
+    if (executor === "github") {
       const denied = await authorizeGitHubExecution();
       if (denied) return denied;
+      return Response.json(await startRun(body), { status: 201 });
     }
-    return Response.json(await startRun(body), { status: 201 });
+    // The mock executor touches no real system, so anyone may use it. Only signed-in owners get their mock runs
+    // saved to the shared history; everyone else receives the full run in the response (session-only).
+    const denied = await authorizeGitHubUser();
+    if (denied && executor !== "mock") return denied;
+    return Response.json(await startRun(body, { persist: !denied }), { status: 201 });
   } catch (e) {
     return errorResponse(e);
   }
