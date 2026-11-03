@@ -1361,3 +1361,10 @@ button {
     scroll-snap-type: x mandatory;
   }
 }
+
+/* live-check status chips must flow inline (the generic .chip is absolutely positioned) */
+.lc-card .chip {
+  position: static;
+  background: transparent;
+  flex: none;
+}

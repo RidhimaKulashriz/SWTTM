@@ -178,7 +178,11 @@ export default function Debugger({ initialRun, initialStep }: { initialRun?: str
       setConnError("");
       setConn({ token, repo }, remember);
       try {
-        const r = await api<ConnInfo & { error?: string }>("/api/github/connect", { method: "POST" });
+        const r = await api<ConnInfo & { error?: string }>("/api/github/connect", {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ token, repo }),
+        });
         if (!r.ok) {
           setConn(null);
           setInfo(null);
