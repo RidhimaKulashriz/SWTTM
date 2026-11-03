@@ -1,0 +1,14 @@
+node_modules
+.next
+.env*
+timemachine/
+.swytchcode/**/secrets*
+.swytchcode/*.lock
+.swytchcode/integrations/*.lock
+.swytchcode/integrations/*/*.lock
+docs/ref/
+next-env.d.ts
+*.tsbuildinfo
+test-results/
+playwright-report/
+.neon

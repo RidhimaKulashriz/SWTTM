@@ -1,0 +1,40 @@
+{
+  "id": "github-issue",
+  "name": "GitHub: create issue, add label, update state (live GitHub API executor)",
+  "executor": "github",
+  "inputs": { "owner": "OWNER", "repo": "REPO", "title": "swy-tm test issue", "label": "bug", "finalState": "closed" },
+  "steps": [
+    {
+      "id": "create",
+      "canonical_id": "github.issue.create",
+      "input": { "owner": "{{inputs.owner}}", "repo": "{{inputs.repo}}", "body": { "title": "{{inputs.title}}" } },
+      "sideEffect": true,
+      "compensate": {
+        "canonical_id": "github.issue.update",
+        "input": { "owner": "{{inputs.owner}}", "repo": "{{inputs.repo}}", "issue_number": "{{steps.create.output.number}}", "body": { "state": "closed" } }
+      }
+    },
+    {
+      "id": "label",
+      "canonical_id": "github.issue.labels.create",
+      "input": {
+        "owner": "{{inputs.owner}}",
+        "repo": "{{inputs.repo}}",
+        "issue_number": "{{steps.create.output.number}}",
+        "body": { "labels": ["{{inputs.label}}"] }
+      },
+      "sideEffect": true
+    },
+    {
+      "id": "close",
+      "canonical_id": "github.issue.update",
+      "input": {
+        "owner": "{{inputs.owner}}",
+        "repo": "{{inputs.repo}}",
+        "issue_number": "{{steps.create.output.number}}",
+        "body": { "state": "{{inputs.finalState}}" }
+      },
+      "sideEffect": true
+    }
+  ]
+}

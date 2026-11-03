@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "runId": "r_oc7GaF",
+  "workflowId": "demo-tracker",
+  "seq": 3,
+  "stepIndex": 1,
+  "stepId": "label",
+  "canonicalId": "tracker.issue.label",
+  "startedAt": "2026-11-02T17:16:50.022Z",
+  "durationMs": 0,
+  "input": {
+    "path": {
+      "id": "{{steps.create.output.id}}"
+    },
+    "body": {
+      "label": "{{inputs.label}}"
+    }
+  },
+  "resolvedInput": {
+    "path": {
+      "id": 2
+    },
+    "body": {
+      "label": "bug"
+    }
+  },
+  "status": "ok",
+  "output": {
+    "id": 2,
+    "labels": [
+      "bug"
+    ]
+  },
+  "sideEffect": true,
+  "executor": "mock",
+  "mock": true,
+  "contextAfter": {
+    "inputs": {
+      "title": "Checkout crashes on empty cart",
+      "label": "bug",
+      "finalState": "closed"
+    },
+    "steps": {
+      "create": {
+        "input": {
+          "body": {
+            "title": "Checkout crashes on empty cart"
+          }
+        },
+        "output": {
+          "id": 2,
+          "title": "Checkout crashes on empty cart",
+          "state": "open",
+          "labels": [],
+          "created_at": "2026-11-02T17:16:50.022Z"
+        }
+      },
+      "label": {
+        "input": {
+          "path": {
+            "id": 2
+          },
+          "body": {
+            "label": "bug"
+          }
+        },
+        "output": {
+          "id": 2,
+          "labels": [
+            "bug"
+          ]
+        }
+      }
+    }
+  },
+  "prevHash": "c17adf52a1dd499162cc8eb161e301077f6fcb536e4c521bbca59a92617339f3",
+  "hash": "1af65fde0830a9e0fc8c8fa57c18e3d689282181a97d1eb013f6ba44d068c8c0"
+}

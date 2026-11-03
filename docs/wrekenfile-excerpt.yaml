@@ -1,0 +1,53 @@
+  github.issue.create:
+    SUMMARY: Create an issue
+      Any user with pull access to a repository can create an issue. If [issues are disabled in the repository](https://docs.github.com/articles/disabling-issues/), the API returns a `410 Gone` status.
+  github.issue.labels.create:
+    SUMMARY: Add labels to an issue
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /repos/{owner}/{repo}/issues/{issue_number}/labels
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(issues_add_labels_43119179_post_repos_owner_repo_issues_issue_number_labels_847fb991Request)
+    EXECUTION:
+      KIND: http
+      MODE: sync
+    INPUTS:
+      - owner:
+          TYPE: STRING
+          REQUIRED: true
+          LOCATION: path
+      - repo:
+          TYPE: STRING
+          REQUIRED: true
+          LOCATION: path
+      - issue_number:
+          TYPE: INT
+          REQUIRED: true
+          LOCATION: path
+      - body:
+          TYPE: STRUCT(issues_add_labels_43119179_post_repos_owner_repo_issues_issue_number_labels_847fb991Request)
+          REQUIRED: false
+          LOCATION: body
+          CONTENT_TYPE: application/json
+    RETURNS:
+      - RETURNTYPE: "[]STRUCT(label)"
+        RETURNVAR: github_issue_labels_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(basic_error_f0f100be)
+        STATUS: 404
+        WHEN: Resource not found (HTTP 404)
+      - TYPE: STRUCT(basic_error_f0f100be)
+        STATUS: 410
+        WHEN: Gone (HTTP 410)
+      - TYPE: STRUCT(validation_error_e1b327)
+        STATUS: 422
+        WHEN: Validation failed, or the endpoint has been spammed. (HTTP 422)
+    CANONICAL_ID: github.issue.labels.create
+  github.issue.update:
+    SUMMARY: Update an issue
+      Issue owners and users with push access or Triage role can edit an issue.

@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "runId": "r_UxFJR2",
+  "workflowId": "demo-tracker",
+  "seq": 2,
+  "stepIndex": 2,
+  "stepId": "close",
+  "canonicalId": "tracker.issue.update",
+  "startedAt": "2026-11-02T17:16:50.019Z",
+  "durationMs": 0,
+  "input": {
+    "path": {
+      "id": "{{steps.create.output.id}}"
+    },
+    "body": {
+      "state": "{{inputs.finalState}}"
+    }
+  },
+  "resolvedInput": {
+    "path": {
+      "id": 1
+    },
+    "body": {
+      "state": "closed"
+    }
+  },
+  "status": "ok",
+  "output": {
+    "id": 1,
+    "title": "Checkout crashes on empty cart",
+    "state": "closed",
+    "labels": [
+      "bug"
+    ],
+    "updated_at": "2026-11-02T17:16:50.019Z"
+  },
+  "sideEffect": true,
+  "executor": "mock",
+  "mock": true,
+  "contextAfter": {
+    "inputs": {
+      "title": "Checkout crashes on empty cart",
+      "label": "bug",
+      "finalState": "closed"
+    },
+    "steps": {
+      "create": {
+        "input": {
+          "body": {
+            "title": "Checkout crashes on empty cart"
+          }
+        },
+        "output": {
+          "id": 1,
+          "title": "Checkout crashes on empty cart",
+          "state": "open",
+          "labels": [],
+          "created_at": "2026-11-02T17:16:50.014Z"
+        }
+      },
+      "label": {
+        "input": {
+          "path": {
+            "id": 1
+          },
+          "body": {
+            "label": "bug"
+          }
+        },
+        "output": {
+          "id": 1,
+          "labels": [
+            "bug"
+          ]
+        }
+      },
+      "close": {
+        "input": {
+          "path": {
+            "id": 1
+          },
+          "body": {
+            "state": "closed"
+          }
+        },
+        "output": {
+          "id": 1,
+          "title": "Checkout crashes on empty cart",
+          "state": "closed",
+          "labels": [
+            "bug"
+          ],
+          "updated_at": "2026-11-02T17:16:50.019Z"
+        }
+      }
+    }
+  },
+  "prevHash": "8f8d89e84271681d83014e3ac0f3b3eab60f00b68a7c88bf33e4be30f73b4e70",
+  "hash": "1fefbe60fb03fc2e2790cffed04efff0d513c3cae873fa40ed5325b5cacda696"
+}

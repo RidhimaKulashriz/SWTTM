@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "runId": "r_oc7GaF",
+  "workflowId": "demo-tracker",
+  "seq": 1,
+  "stepIndex": 0,
+  "stepId": "create:compensate",
+  "canonicalId": "tracker.issue.delete",
+  "startedAt": "2026-11-02T17:16:50.022Z",
+  "durationMs": 0,
+  "input": {
+    "path": {
+      "id": "{{steps.create.output.id}}"
+    }
+  },
+  "resolvedInput": {
+    "path": {
+      "id": 1
+    }
+  },
+  "status": "ok",
+  "output": {
+    "id": 1,
+    "deleted": true
+  },
+  "sideEffect": true,
+  "executor": "mock",
+  "mock": true,
+  "contextAfter": {
+    "inputs": {
+      "title": "Checkout crashes on empty cart",
+      "label": "bug",
+      "finalState": "done"
+    },
+    "steps": {
+      "create": {
+        "input": {
+          "body": {
+            "title": "Checkout crashes on empty cart"
+          }
+        },
+        "output": {
+          "id": 1,
+          "title": "Checkout crashes on empty cart",
+          "state": "open",
+          "labels": [],
+          "created_at": "2026-11-02T17:16:50.014Z"
+        }
+      }
+    }
+  },
+  "prevHash": "b20643a274005a5731e9a614f180d2686215dc71a8d7840442973e505471f791",
+  "hash": "1b0fa668985dacb49ab0d56c27fc96f862923cdf9a01fb8e8296b32beb92a6b9"
+}

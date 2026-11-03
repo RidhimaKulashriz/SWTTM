@@ -1,0 +1,371 @@
+### $ swytchcode --help
+Execution authority for agentic API providers.
+
+This command is also available as the shorter alias 'swy' (for example: swy list, swy exec).
+
+Usage:
+  swytchcode [command]
+
+Project setup:
+  add         Add a method, workflow, or provider
+  bootstrap   Fetch all providers declared in tooling.json
+  get         Fetch Wrekenfile bundles for a provider
+  init        Initialize Swytchcode in this project
+  policy      Manage method-level guard policies
+  sync        Sync workflows and methods from the backend for installed providers
+  workflow    Create, validate, publish, and pull SWF v1 workflows
+
+Discover:
+  discover    Find API capabilities matching a natural language intent
+  info        Show information about a tool by canonical ID
+  list        List locally available tools and providers
+  plan        Show the steps for a workflow
+  search      Search providers and published workflows
+
+Run:
+  demo        Explore and run demo providers
+  examples    Download a working example project
+  exec        Execute a tool via the Swytchcode kernel
+
+Account:
+  auth        Connect and manage third-party provider credentials
+  login       Log in to your Swytchcode account
+  logout      Log out and remove the local session
+  whoami      Show the current authentication state
+  workspace   Show or change which workspace this project uses
+
+System:
+  audit       View local execution audit log, policy violations, network activity, and stats
+  config      Manage Swytchcode CLI configuration
+  doctor      Run local diagnostics for the Swytchcode project
+  mcp         MCP server commands
+
+Additional Commands:
+  help        Help about any command
+
+Flags:
+  -h, --help      help for swytchcode
+  -v, --version   version for swytchcode
+
+Use "swytchcode [command] --help" for more information about a command.
+[exit 0]
+### $ swytchcode exec --help
+Execute a tool (method or workflow) via the Swytchcode kernel.
+
+Supports two input modes:
+  1. CLI args: swytchcode exec api.cluster.create --body file.json
+  2. JSON stdin: echo '{"tool":"api.cluster.create","args":{...}}' | swytchcode exec
+
+The kernel is pure, deterministic, non-interactive, and offline-capable.
+It reads only local files (tooling.json, provider bundles) and never calls the registry.
+
+Usage:
+  swytchcode exec [canonical_id] [flags]
+
+Flags:
+      --allow-raw             allow execution of raw methods (required for tools starting with 'raw.')
+      --body string           request body: file path or inline JSON (e.g. --body request.json or --body '{"amount":5000}')
+      --demo                  run in demo mode - no project setup or API keys required
+      --dry-run               show what would be executed without making the HTTP call
+      --explain               show what would be executed without making any API call, then exit 0
+      --header stringArray    request header key=value pairs (can be specified multiple times)
+  -h, --help                  help for exec
+      --input stringArray     input key=value pairs (can be specified multiple times)
+      --json                  output response as JSON (single JSON object to stdout)
+      --output string         write binary response body to this file (required for non-JSON/text responses)
+      --param stringArray     query parameter key=value pairs (can be specified multiple times)
+      --raw                   output raw HTTP response instead of normalized JSON
+      --tenant string         run the call for one end user of your app, with their own connected account (your id for them)
+      --tenant-label string   how approvers see that end user, e.g. "Alice Smith (alice@acme.com)" (with --tenant)
+      --verbose               log request and response details to stderr for debugging (headers are redacted)
+      --verbose-network       log a one-line summary of each outbound network call to stderr
+[exit 0]
+### $ swytchcode init --help
+Initialize Swytchcode in this project
+
+Usage:
+  swytchcode init [flags]
+
+Flags:
+      --editor string     cursor | claude | codex | copilot | gemini | hermes | openclaw | windsurf | none, or with --operator: hermes | openclaw | zeroclaw | none
+  -h, --help              help for init
+      --mode string       production | sandbox
+      --non-interactive   disable prompts; suitable for CI
+      --operator          set the project up for a personal agent driven from a chat (hermes, openclaw, zeroclaw or none)
+      --project string    initialise this folder (created if missing) instead of the current directory
+[exit 0]
+### $ swytchcode get --help
+Fetch Wrekenfile bundles for a provider
+
+Usage:
+  swytchcode get [provider|provider@library:version] [flags]
+
+Flags:
+  -h, --help              help for get
+      --non-interactive   disable prompts; suitable for CI
+      --yes               auto-confirm overwrite in non-interactive mode
+[exit 0]
+### $ swytchcode add --help
+Add tools to your project:
+
+  swytchcode add method <canonical_id>     Enable a method from local wrekenfiles
+  swytchcode add workflow <canonical_id>   Install a workflow (auto-fetches missing providers)
+  swytchcode add provider <spec>           Register a provider version in tooling.json
+
+As a shorthand, "swytchcode add <canonical_id>" enables a method directly,
+equivalent to "swytchcode add method <canonical_id>".
+
+Usage:
+  swytchcode add <subcommand> [flags]
+  swytchcode add [command]
+
+Available Commands:
+  method      Enable a method in tooling.json from local wrekenfiles
+  provider    Add a provider version to tooling.json (explicit, reviewable; does not fetch)
+  workflow    Install a workflow and auto-fetch missing providers
+
+Flags:
+  -h, --help   help for add
+
+Use "swytchcode add [command] --help" for more information about a command.
+[exit 0]
+### $ swytchcode info --help
+Show information about a tool by canonical ID
+
+Usage:
+  swytchcode info <canonical_id> [flags]
+
+Flags:
+  -h, --help   help for info
+      --json   output as JSON
+[exit 0]
+### $ swytchcode list --help
+Scans .swytchcode/integrations for methods and .swytchcode/workflows/ for installed workflow YAML files. Use 'tooling' to list only what has been explicitly enabled via 'swytchcode add method' or 'swytchcode add workflow'. Optional pattern filters by canonical_id or provider name (case-insensitive). No registry calls.
+
+Usage:
+  swytchcode list [methods|workflows|providers|tooling] [pattern] [flags]
+
+Flags:
+  -h, --help   help for list
+      --json   output as JSON object
+[exit 0]
+### $ swytchcode search --help
+Searches the remote registry for providers and published workflows.
+
+Without a keyword, lists all available providers.
+With a keyword, returns matching providers and published workflows via semantic search.
+
+Results are cached for 1 hour - use --refresh to force a fresh fetch.
+
+Usage:
+  swytchcode search [intent] [flags]
+
+Flags:
+      --all         show all provider results
+  -h, --help        help for search
+      --json        output providers as JSON array
+      --limit int   maximum provider results to show (default 10)
+      --refresh     bypass cache and fetch fresh results
+[exit 0]
+### $ swytchcode audit --help
+View local execution data stored in ~/.swytchcode/audit/: outbound network
+activity, policy-violation history, and execution stats.
+
+Run with no arguments in an interactive terminal to be prompted for which one
+to view, or go straight to a subcommand:
+
+  swytchcode audit network  - view recent outbound network calls
+  swytchcode audit policy   - view recent policy-violation log entries
+  swytchcode audit stats    - execution history and success rate
+  swytchcode audit clear    - delete all local audit files
+
+Note: to manage guard-policy rules (add/list/remove/validate), use the
+separate 'swytchcode policy' command - that's configuration, not a log.
+
+Usage:
+  swytchcode audit [flags]
+  swytchcode audit [command]
+
+Available Commands:
+  clear        Delete all local audit files
+  network      Show recent outbound network calls recorded during exec
+  policy       View recent policy decisions (blocked and approval requests) with status
+  stats        Show local execution history and success rate
+
+Flags:
+  -h, --help            help for audit
+      --tenant string   show only entries for one end user of your app (your id for them)
+
+Use "swytchcode audit [command] --help" for more information about a command.
+[exit 0]
+### $ swytchcode init --editor=none --mode=sandbox --non-interactive
+› initialized project at /tmp/swyprobe
+
+next
+  › swytchcode get <provider>      fetch provider bundles
+  › swytchcode add <canonical_id>  register a tool in tooling.json
+[exit 0]
+### $ swytchcode get github
+error: authentication required for get: not authenticated - run `swytchcode login` for registry features (local execution works without auth)
+posthog 2026/11/02 17:10:40 WARN: shutdown timeout: 0 batches still in flight
+posthog 2026/11/02 17:10:40 WARN: shutdown timeout exceeded, some messages may be lost
+[exit 1]
+### $ find .swytchcode
+.swytchcode/tooling.json
+.swytchcode/tooling.json.lock
+### $ swytchcode login --help
+Log in to your Swytchcode account via device-flow OAuth:
+  swytchcode login
+
+To connect a provider, use 'swytchcode auth connect <provider>' instead.
+Use --open to have the CLI open the OAuth URL in your browser automatically.
+
+Usage:
+  swytchcode login [flags]
+
+Flags:
+  -h, --help   help for login
+      --open   Open the login URL in your browser automatically
+[exit 0]
+### $ swytchcode demo --help
+Explore and run demo providers
+
+Usage:
+  swytchcode demo [flags]
+  swytchcode demo [command]
+
+Available Commands:
+  list        List all available demo tools
+  stripe      Run a Stripe payment demo - no setup or API keys required
+
+Flags:
+  -h, --help   help for demo
+
+Use "swytchcode demo [command] --help" for more information about a command.
+[exit 0]
+### $ swytchcode examples --help
+Interactively choose an example and framework, then download a ready-to-run Python project.
+
+Usage:
+  swytchcode examples [flags]
+  swytchcode examples [command]
+
+Available Commands:
+  list        List all available examples
+
+Flags:
+  -f, --framework string   Framework ID (e.g. langgraph)
+  -h, --help               help for examples
+  -i, --index int          1-based example index
+  -n, --name string        Example name or canonical ID (e.g. customer.onboarding)
+
+Use "swytchcode examples [command] --help" for more information about a command.
+[exit 0]
+### $ swytchcode demo
+Explore and run demo providers
+
+Usage:
+  swytchcode demo [flags]
+  swytchcode demo [command]
+
+Available Commands:
+  list        List all available demo tools
+  stripe      Run a Stripe payment demo - no setup or API keys required
+
+Flags:
+  -h, --help   help for demo
+
+Use "swytchcode demo [command] --help" for more information about a command.
+[exit 0]
+### $ swytchcode list
+Methods:
+
+Workflows:
+
+Providers:
+[exit 0]
+### $ swytchcode list --json
+{}
+[exit 0]
+### $ swytchcode search issue
+Fetching providers......
+Providers
+
+Log in to also search published workflows: swytchcode login
+[exit 0]
+### $ swytchcode whoami
+backend:       https://api-v2.swytchcode.com (default)
+Not logged in.
+[exit 0]
+### $ swytchcode demo list
+
+Available demos:
+
+  Stripe
+  - stripe.create_payment
+
+Run a demo:
+  swytchcode demo <provider>  (e.g. swytchcode demo stripe)
+
+[exit 0]
+### $ swytchcode search github --json
+["GitHub"]
+[exit 0]
+### $ swytchcode exec --demo stripe.payment.create --dry-run --json
+Telemetry is disabled. Run `swytchcode login` or set SWYTCHCODE_TOKEN to enable usage tracking.
+Fetching stripe......
+› found 1 bundles
+
+Fetching methods......
+  hint: run 'swytchcode login' to fetch method definitions (required for IDE autocomplete)
+Saving bundle 1/1 (stripe@2026-06-24.dahlia)......
+› saved Stripe/stripe@2026-06-24.dahlia
+
+running in demo mode (stripe.payment.create not added yet)
+   run: swytchcode add method stripe.payment.create
+2026/11/02 17:10:52 [swytchcode exec] request tool=stripe.payment.create
+{"category":"network","error":"demo unavailable for stripe.payment.create: no demo available for stripe.payment.create — supported: stripe.create_payment"}
+[exit 4]
+### $ swytchcode exec --demo --help
+Execute a tool (method or workflow) via the Swytchcode kernel.
+
+Supports two input modes:
+  1. CLI args: swytchcode exec api.cluster.create --body file.json
+  2. JSON stdin: echo '{"tool":"api.cluster.create","args":{...}}' | swytchcode exec
+
+The kernel is pure, deterministic, non-interactive, and offline-capable.
+It reads only local files (tooling.json, provider bundles) and never calls the registry.
+
+Usage:
+  swytchcode exec [canonical_id] [flags]
+
+Flags:
+      --allow-raw             allow execution of raw methods (required for tools starting with 'raw.')
+      --body string           request body: file path or inline JSON (e.g. --body request.json or --body '{"amount":5000}')
+      --demo                  run in demo mode - no project setup or API keys required
+      --dry-run               show what would be executed without making the HTTP call
+      --explain               show what would be executed without making any API call, then exit 0
+      --header stringArray    request header key=value pairs (can be specified multiple times)
+  -h, --help                  help for exec
+      --input stringArray     input key=value pairs (can be specified multiple times)
+      --json                  output response as JSON (single JSON object to stdout)
+      --output string         write binary response body to this file (required for non-JSON/text responses)
+      --param stringArray     query parameter key=value pairs (can be specified multiple times)
+      --raw                   output raw HTTP response instead of normalized JSON
+      --tenant string         run the call for one end user of your app, with their own connected account (your id for them)
+      --tenant-label string   how approvers see that end user, e.g. "Alice Smith (alice@acme.com)" (with --tenant)
+      --verbose               log request and response details to stderr for debugging (headers are redacted)
+      --verbose-network       log a one-line summary of each outbound network call to stderr
+[exit 0]
+### $ swytchcode exec github.issues.create --json --dry-run  (not installed)
+Telemetry is disabled. Run `swytchcode login` or set SWYTCHCODE_TOKEN to enable usage tracking.
+Fetching github......
+› found 1 bundles
+
+Fetching methods......
+  hint: run 'swytchcode login' to fetch method definitions (required for IDE autocomplete)
+Saving bundle 1/1 (github@1.1.4)......
+› saved GitHub/github@1.1.4
+
+running in demo mode (github.issues.create not added yet)
+[exit 2]
